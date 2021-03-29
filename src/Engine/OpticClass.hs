@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Engine.OpticClass where
@@ -10,6 +9,14 @@ module Engine.OpticClass where
 
 import           Control.Monad.State                hiding (state)
 import           Numeric.Probability.Distribution   hiding (lift)
+
+
+import qualified Optics.Getter as G
+import qualified Optics.Lens as L
+import qualified Optics.Optic as O
+import           Optics.Optic ((%))
+import qualified Optics.ReadOnly as RO
+import qualified Optics.Setter as S
 
 class Optic o where
   lens :: (s -> a) -> (s -> b -> t) -> o s t a b
@@ -95,4 +102,74 @@ instance ContextAdd StochasticStatefulContext where
     = let fs = [((z, s2), p) | ((z, Right s2), p) <- decons h]
        in if null fs then Nothing
                      else Just (StochasticStatefulContext (fromFreqs fs) (\z a2 -> k z (Right a2)))
+
+---------------------------------------------
+-- 1 Replicate optics from external modules
+-- Concrete lense from Optics package
+-- Used for pure open games 
+
+type PureLens = O.Optic L.A_Lens O.NoIx
+
+
+instance Optic PureLens where
+  lens = L.lens
+  (>>>>) = (%)
+  (&&&&) = L.alongside
+  (++++) o1  o2 = L.lens v u
+    where v1 = (G.view . RO.getting) o1
+          v2 = (G.view . RO.getting) o2
+          sttr1 = S.set o1
+          sttr2 = S.set o2
+          v (Left s1)  = let a1 = v1 s1 in Left a1
+          v (Right s2) = let a2 = v2 s2 in Right a2
+          u (Left s1) b = sttr1 b s1
+          u (Right s2) b = sttr2 b s2
+
+
+data PureLensContext s t a b where
+  PureLensContext :: s -> (a -> b) -> PureLensContext s t a b
+
+
+instance Precontext PureLensContext where
+  void = PureLensContext () (\() -> ())
+
+
+instance Context PureLensContext PureLens where
+  cmap l1 l2 (PureLensContext h k)
+            = let v1 = (G.view . RO.getting) l1
+                  v2 = (G.view . RO.getting) l2
+                  sttr2 = S.set l2
+                  s     = h
+                  h'    = v1 s
+                  k' a  = sttr2 (k (v2 a)) a
+                  in PureLensContext h' k'
+  (//) l1 (PureLensContext h k)
+            = let v1      = (G.view . RO.getting) l1
+                  (s1,s2) = h
+                  h'      = s2
+                  k' a2   = snd $ k (v1 s1,a2)
+               in PureLensContext h' k'
+  (\\) l2 (PureLensContext h k)
+            = let v2      = (G.view . RO.getting) l2
+                  (s1,s2) = h
+                  h'      = s1
+                  k' a1   = fst $ k (a1, v2 s2) 
+               in PureLensContext h' k'
+
+
+instance ContextAdd PureLensContext where
+  prl (PureLensContext h k)
+    = case h of
+         Left s1 -> Just (PureLensContext s1 (k . Left))
+         _       -> Nothing
+  prr (PureLensContext h k)
+    = case h of
+         Right s2 -> Just (PureLensContext s2 (k . Right))
+         _       -> Nothing
+
+
+---------------------------------------------------
+-- 2 Replicate lenses from the Control.Lens package
+
+
 
