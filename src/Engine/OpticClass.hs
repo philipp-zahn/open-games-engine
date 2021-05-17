@@ -36,8 +36,8 @@ class Precontext c where
 
 class (Optic o, Precontext c) => Context c o where
   cmap :: o s1 t1 s2 t2 -> o a1 b1 a2 b2 -> c s1 t1 a2 b2 -> c s2 t2 a1 b1
-  (//) :: (Show s1) => o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
-  (\\) :: (Show s2) => o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
+  (//) :: (Show s1, Show s2) => o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
+  (\\) :: (Show s1, Show s2) => o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
 
 -- (\\) is derivable from (//) using
 -- l \\ c = l // (cmap (lift swap swap) (lift swap swap) c)
@@ -51,7 +51,7 @@ class ContextAdd c where
   prr :: c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s2 t a2 b)
 
 -------------------------------------------------------------
---- replicate the old implementation of a stochastic context 
+--- replicate the old implementation of a stochastic context
 type Stochastic = T Double
 type Vector = String -> Double
 
@@ -76,7 +76,7 @@ instance Optic StochasticStatefulOptic where
           u (Right z2) b = u2 z2 b
 
 data StochasticStatefulContext s t a b where
-  StochasticStatefulContext :: (Show z) => Stochastic (z, s) -> (z -> a -> StateT Vector Stochastic b) -> StochasticStatefulContext s t a b
+  StochasticStatefulContext :: Show z => Stochastic (z, s) -> (z -> a -> StateT Vector Stochastic b) -> StochasticStatefulContext s t a b
 
 instance Precontext StochasticStatefulContext where
   void = StochasticStatefulContext (return ((), ())) (\() () -> return ())
