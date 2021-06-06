@@ -160,3 +160,6 @@ TSWLatexianTemp*
 
 # DS Store
 .DS_Store
+
+# stack directory
+.stack-work/
