@@ -19,6 +19,7 @@ module Engine.OpticClass
 
 import           Control.Monad.State                hiding (state)
 import           Numeric.Probability.Distribution   hiding (lift)
+import           Data.Maybe
 
 class Optic o where
   lens :: (s -> a) -> (s -> b -> t) -> o s t a b
@@ -49,12 +50,14 @@ class (Optic o, Precontext c) => Context c o where
 class ContextAdd c where
   prl :: c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s1 t a1 b)
   prr :: c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s2 t a2 b)
+  match :: c (Either s1 s2) t (Either a1 a2) b -> Either (c s1 t a1 b) (c s2 t a2 b)
+  match o = maybe (maybe (error "malformed lens +++") Right (prr o))
+                                                      Left (prl o)
 
 -------------------------------------------------------------
 --- replicate the old implementation of a stochastic context
 type Stochastic = T Double
 type Vector = String -> Double
-
 
 data StochasticStatefulOptic s t a b where
   StochasticStatefulOptic :: (s -> Stochastic (z, a))

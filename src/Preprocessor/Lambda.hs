@@ -51,6 +51,7 @@ data Lambda
   | Ifix String Lambda Lambda
   | PFix String Lambda
   | LLet Pattern Lambda Lambda
+  | Unbound Name
   deriving ( Eq, Show )
 
 data Literal
@@ -83,7 +84,7 @@ modifiedHaskell = emptyDef
                 , Tok.identLetter    = alphaNum <|> oneOf "_'"
                 , Tok.opStart        = Tok.opLetter modifiedHaskell
                 , Tok.opLetter       = oneOf ":!#$%&*+./<=>?@\\^-~"
-                , Tok.reservedOpNames= ["::","..","=","\\","|","<-","->","@","~","=>", "$", "-<", ";", "|", "<<=", "||", "=>>"]
+                , Tok.reservedOpNames= ["::","..","=","\\","|","<-","->","@","~","=>", "$", "-<", ";", "|", "<<=", "||", "=>>", "_"]
                 , Tok.reservedNames  = languageKeywords
                 , Tok.caseSensitive  = True
                 }
@@ -176,6 +177,9 @@ parseLit :: Parser Literal
 parseLit = LString <$> Tok.stringLiteral lexer
        <|> LInt . fromIntegral <$> natural
 
+parseUnbound :: Parser Lambda
+parseUnbound = reservedOp "_" *> pure (Unbound "")
+
 parsePattern :: Parser Pattern
 parsePattern =
   (do p <- identifier ;
@@ -203,7 +207,6 @@ parseLet = do
   reserved "in"
   body <- expr
   pure (LLet varName value body)
-
 
 parseTuple :: Parser Lambda
 parseTuple = do
@@ -264,6 +267,8 @@ term =  parens (try parseTuple <|> expr)
     <|> brackets bracketed
     <|> doNotation
     <|> parseLet
+    <|> parseUnbound
+
 
 appl :: Parser Lambda
 appl = do
@@ -278,9 +283,30 @@ data ParsedLine p e = MkParsedLine { covOut :: [p]
                                    , op :: e
                                    , conOut :: [p]
                                    , covIn :: [e]
-                                   } deriving (Eq, Show)
+                                   } deriving (Eq)
+instance (Show p, Show e) => Show (ParsedLine p e) where
+  show (MkParsedLine covOut conIn op conOut covIn) = concat
+      [ "ParseLine:"
+      , "\ncovariant outputs: ", show covOut
+      , "\ncontravariant inputs : ", show conIn
+      , "\noperation : ", show op
+      , "\ncontravariant outputs : ", show conOut
+      , "\ncovariant inputs: ", show covIn
+      ]
 
-data ParsedBlock p e l = MkParsedBlock [p] [e] [l] [p] [e]
+data ParsedBlock p e l = MkParsedBlock [p] [e] [l] [p] [e] deriving (Eq)
+
+instance (Show p, Show e, Show l) => Show (ParsedBlock p e l) where
+  show (MkParsedBlock covOut conIn op conOut covIn) = concat
+      [ "ParsedBlock"
+      , "\ncovariant outputs: ", show covOut
+      , "\ncontravariant inputs : ", show conIn
+      , "\n-----------------------"
+      , "\n", unlines (map show op)
+      , "\n-----------------------"
+      , "\ncontravariant outputs : ", show conOut
+      , "\ncovariant inputs: ", show covIn
+      ]
 
 parseLine :: Parser p -> Parser e -> Parser (ParsedLine p e)
 parseLine parseP parseE = pure MkParsedLine
@@ -306,7 +332,7 @@ parseTwoLines kw1 kw2 parseP parseE =
 
 parseInput = parseTwoLines "inputs" "feedback"
 
-parseOutput = parseTwoLines "outputs" "returns" 
+parseOutput = parseTwoLines "outputs" "returns"
 
 parseDelimiter = colon *> many1 (string "-") <* colon
 
@@ -316,7 +342,6 @@ parseVerboseLine parseP parseE = do
   program <- reserved "operation" *> colon *> parseE <* semi
   (outputs,returns) <- option ([], []) (parseOutput parseP parseE)
   pure $ MkParsedLine outputs returns program feedback input
-
 
 parseVerboseSyntax :: Parser p -> Parser e -> Parser l -> Parser (ParsedBlock p e l)
 parseVerboseSyntax parseP parseE parseL =

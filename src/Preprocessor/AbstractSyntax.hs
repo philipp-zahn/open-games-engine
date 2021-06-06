@@ -69,7 +69,6 @@ data Block p e = Block {
   blockLines :: [Line p e],
   blockCovariantOutputs :: [e], blockContravariantInputs :: [p]} deriving (Eq, Show, Functor)
 
-
 instance Applicative (Block p) where
   pure v = Block [] [] (pure (pure v)) [] []
   (<*>) :: Block p (a -> b) -> Block p a -> Block p b
@@ -83,7 +82,6 @@ instance Applicative (Block p) where
       where
         mapLines :: [Line p (a -> b)] -> [a] -> [b]
         mapLines f as = fmap extract f <*> as
-
 
 instance Foldable (Block p) where
   foldr f init (Block _ _ arg _ _)  =

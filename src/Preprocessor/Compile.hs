@@ -15,6 +15,8 @@ module Preprocessor.Compile
   , parseLambdaAsExp
   , game
   , parseVerboseGame
+  , printTree
+  , printGame
   , opengame
   ) where
 
@@ -25,6 +27,7 @@ import Preprocessor.AbstractSyntax
 import Preprocessor.TH
 
 import Data.Char
+import Data.Bifunctor
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Quote
 import Language.Haskell.TH as TH
@@ -54,7 +57,7 @@ compileLambda (Do sm) = DoE (map toStatement sm)
     toStatement :: (Maybe String, Lambda) -> Stmt
     toStatement (Nothing, lam) = NoBindS (compileLambda lam)
     toStatement (Just pat, lam) = BindS (VarP (mkName pat)) (compileLambda lam)
-compileLambda (Tuple f s r) = TupE (map (compileLambda) (f : s : r))
+compileLambda (Tuple f s r) = TupE (map compileLambda (f : s : r))
 compileLambda (Range range) = ArithSeqE (compileRange range)
 compileLambda (IfThenElse prd thn els) = CondE (compileLambda prd) (compileLambda thn) (compileLambda els)
 compileLambda (Ifix op left right) = InfixE (Just $ compileLambda left)
@@ -67,6 +70,7 @@ compileLambda (LLet pat val body) = LetE [ValD (compilePattern pat)
                                                (NormalB (compileLambda val))
                                                []]
                                          (compileLambda body)
+compileLambda (Unbound _) = UnboundVarE (mkName "_")
 
 
 compilePattern :: Pattern -> Pat
@@ -87,6 +91,7 @@ compLine (MkParsedLine covOut conIn op conOut covIn) =
                 (compileLambda <$> covIn)
 
 
+-- Converts from the in-house AST to the template haskell AST
 convertGame :: GameAST Pattern Lambda -> GameAST Pat Exp
 convertGame (MkParsedBlock covIn conOut lns covOut conIn) =
   MkParsedBlock (fmap compilePattern covIn)
@@ -102,6 +107,7 @@ compileGameLine (MkParsedLine { covOut
                           , conOut
                           , covIn }) = Line covIn conOut op covOut conIn
 
+-- convert from GameAST to Block
 compileAST :: GameAST Pat Exp -> Block Pat Exp
 compileAST (MkParsedBlock a b c d e) =
   Block a b (fmap compileGameLine c) e d
@@ -113,11 +119,14 @@ parseLambdaAsOpenGame input =
     Right v -> Just $ compileBlock $ compileAST $ convertGame v
 
 
-parseLambdaAsExp :: String -> Q Exp
-parseLambdaAsExp input = case parseLambda input of
-                           Left err -> error (show err)
-                           Right v ->  (interpretOpenGame $ compileBlock $ compileAST $ convertGame v)
+fromAST :: GameAST Pattern Lambda -> FreeOpenGame Pat Exp
+fromAST = compileBlock . compileAST . convertGame
 
+parseLambdaAsExp :: String -> Q Exp
+parseLambdaAsExp input =
+  either (error . show) (interpretOpenGame . fromAST) (parseLambda input)
+
+-- A Quasiquoter for lambda expressions
 game :: QuasiQuoter
 game = QuasiQuoter
      { quoteExp  = parseLambdaAsExp . dropWhile isSpace
@@ -126,16 +135,37 @@ game = QuasiQuoter
      , quoteDec  = error "expected expr"
      }
 
-
 parseVerboseGame :: String -> Q Exp
-parseVerboseGame input = case parseVerbose input of
-                           Left err ->  error (show err)
-                           Right v ->  (interpretOpenGame $ compileBlock $ compileAST $ convertGame v)
+parseVerboseGame input =
+  either (error . show) (interpretOpenGame . fromAST) (parseVerbose input)
 
 opengame :: QuasiQuoter
 opengame = QuasiQuoter
-     { quoteExp  = parseVerboseGame . dropWhile isSpace
-     , quotePat  = error "expected expr"
-     , quoteType = error "expected expr"
-     , quoteDec  = error "expected expr"
-     }
+    { quoteExp  = parseVerboseGame . dropWhile isSpace
+    , quotePat  = error "expected expr"
+    , quoteType = error "expected expr"
+    , quoteDec  = error "expected expr"
+    }
+
+-- print the parsed AST crash if it does not parse
+parseAndPrintGame :: String -> String
+parseAndPrintGame =  either (error . show) (show) . parseVerbose . dropWhile isSpace
+
+printGame :: QuasiQuoter
+printGame = QuasiQuoter
+    { quoteExp  = \str -> [|parseAndPrintGame str|]
+    , quotePat  = error "expected expr"
+    , quoteType = error "expected expr"
+    , quoteDec  = error "expected expr"
+    }
+
+parseAndPrintTree :: String -> String
+parseAndPrintTree =  either (error . show) (show . bimap show show . fromAST) . parseVerbose . dropWhile isSpace
+
+printTree :: QuasiQuoter
+printTree = QuasiQuoter
+    { quoteExp = \str -> [|parseAndPrintTree str |]
+    , quotePat  = error "expected expr"
+    , quoteType = error "expected expr"
+    , quoteDec  = error "expected expr"
+    }

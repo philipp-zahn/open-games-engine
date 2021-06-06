@@ -67,10 +67,10 @@ covariantContexts block = map f (init (inits (map (Variables . covariantOutputs)
 
 contravariantContexts :: Block p e -> [Variables p]
 contravariantContexts block = map (f . reverse) (tail (tails (map (Variables . contravariantOutputs) (blockLines block))))
-  where f contexts = flattenVariables (concat [[Variables (blockCovariantInputs block)],
-                                                   map (Variables . covariantOutputs) (blockLines block),
-                                                   [Variables (blockContravariantInputs block)],
-                                                   contexts])
+  where f contexts = flattenVariables (concat [ [Variables (blockCovariantInputs block)]
+                                              , map (Variables . covariantOutputs) (blockLines block)
+                                              , [Variables (blockContravariantInputs block)]
+                                              , contexts])
 
 linesWithContext :: Block p e -> [LineWithContext p e]
 linesWithContext block = zipWith3 LineWithContext (blockLines block) (covariantContexts block) (contravariantContexts block)

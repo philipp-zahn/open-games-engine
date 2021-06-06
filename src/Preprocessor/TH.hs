@@ -13,8 +13,6 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Preprocessor.Types
 
-
-
 combinePats :: [Pat] -> Pat
 combinePats [x] = x
 combinePats xs = TupP xs
@@ -25,7 +23,7 @@ apply fn (x : xs) = apply (AppE fn x) xs
 
 patToExp :: Pat -> Exp
 patToExp (VarP e) = VarE e
-patToExp (TupP e) = TupE (map (patToExp) e)
+patToExp (TupP e) = TupE (map patToExp e)
 patToExp (LitP e) = LitE e
 patToExp (ListP e) = ListE (fmap patToExp e)
 patToExp (ConP n e) = apply (VarE n) (fmap patToExp e)
@@ -37,10 +35,10 @@ interpretFunction (Lambda (Variables {vars}) (Expressions {exps})) =
   pure $ LamE (pure $ TupP vars) (TupE exps)
 interpretFunction (CopyLambda (Variables { vars }) (Expressions { exps })) =
   pure $ LamE (pure $ TupP vars) (TupE [TupE $ map patToExp vars, TupE exps])
+
 interpretFunction (Multiplex (Variables { vars }) (Variables { vars = vars' })) =
   pure $ LamE (pure $ TupP [combinePats vars, combinePats vars']) (TupE $ map patToExp (vars ++ vars'))
 interpretFunction (Curry f) = [| curry $(interpretFunction f)|]
-
 
 interpretOpenGame :: FreeOpenGame Pat Exp-> Q Exp
 interpretOpenGame (Atom n) = pure n

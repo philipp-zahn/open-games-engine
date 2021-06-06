@@ -10,6 +10,8 @@ module Engine.OpenGames
  ( OpenGame(..)
  , lift
  , reindex
+ , population
+ , fromFunctions
  , (>>>)
  , (&&&)
  ) where
@@ -17,6 +19,8 @@ module Engine.OpenGames
 
 import Engine.OpticClass
 import Engine.TLL
+import Engine.Vec as Vec
+import Engine.Nat
 import Data.Type.Equality ((:~:)(..))
 
 data OpenGame o c a b x s y r = OpenGame {
@@ -45,6 +49,30 @@ reindex v u g = OpenGame {
   evaluate = \as c -> case unappend as of (a, a') -> evaluate g a (cmap identity (play h a') c)
                                                   +:+ evaluate h a' (cmap (play g a) identity c)
 }
+-- TODO: Check if this works
+-- (+++) :: forall x1 x2 c o a a' b s y1 y2 r.
+--          (Show x1, Show x2, Optic o, Context c o, ContextAdd c, Unappend a, Unappend a')
+--       => OpenGame o c a (b x1 y1) x1 s y1 r -> OpenGame o c a' (b x2 y2) x2 s y2 r
+--       -> OpenGame o c (a +:+ a') (b (Either x1 x2) (Either y1 y2)) (Either x1 x2) s (Either y1 y2) r
+-- (+++) g1 g2 = OpenGame
+--   (\ls -> case unappend @a @a' ls of (l1, l2) -> let p1 = play g1 l1
+--                                                      p2 = play g2 l2
+--                                                   in p1 ++++ p2)
+--   (\ls body ->
+--     case unappend @a @a' ls of
+--       (l1, l2) -> either (evaluate g1 l1) (evaluate g2 l2) (match body))
+--
+(+++) :: forall x1 x2 c o a a' b s y1 y2 r.
+         (Show x1, Show x2, Optic o, Context c o, ContextAdd c, Unappend a, Unappend a')
+      => OpenGame o c a b x1 s y1 r -> OpenGame o c a' b x2 s y2 r
+      -> OpenGame o c (a +:+ a') b (Either x1 x2) s (Either y1 y2) r
+(+++) g1 g2 = OpenGame
+  (\ls -> case unappend @a @a' ls of (l1, l2) -> let p1 = play g1 l1
+                                                     p2 = play g2 l2
+                                                  in p1 ++++ p2)
+  (\ls body ->
+    case unappend @a @a' ls of
+      (l1, l2) -> either (evaluate g1 l1) (evaluate g2 l2) (match body))
 
 (&&&) :: (Optic o, Context c o, Unappend a, Unappend b, Show x, Show x')
       => OpenGame o c a b x s y r -> OpenGame o c a' b' x' s' y' r'
@@ -54,6 +82,11 @@ reindex v u g = OpenGame {
   evaluate = \as c -> case unappend as of (a, a') -> evaluate g a (play h a' \\ c)
                                                  +:+ evaluate h a' (play g a // c)
 }
+
+fromFunctions :: forall o c a b x s y r.
+  Optic o => Context c o => (x -> y) -> (r -> s) -> OpenGame o c '[] '[] x s y r
+fromFunctions f g = lift (lens f (const g))
+
 omap :: Optic o =>
         (s -> s') ->
         (x' -> x) ->
@@ -82,14 +115,18 @@ pop1 game =
    in case repeat1Proof @a of
         Refl -> case repeat1Proof @b of Refl -> v
 
-split :: Vec (S n) a -> (a, Vec n a)
-split (x :> xs) = (x, xs)
+-- Split a vector into its head and tail, opposite of `cons`
+uncons :: Vec (S n) a -> (a, Vec n a)
+uncons (x :> xs) = (x, xs)
 
-stick :: (a, Vec n a) -> Vec (S n) a
-stick (x, xs) = x :> xs
+-- Stick a value and a vector together, opposite of `uncons`
+cons :: (a, Vec n a) -> Vec (S n) a
+cons (x, xs) = x :> xs
 
+-- Duplicates a player `n` times where `n` must be >= 1
 population :: forall o c a b x s y r n.
-  (Optic o, Context c o, Unappend a, Unappend b, Show x) => Natural n ->
+  (Optic o, Context c o, Unappend a, Unappend b, Show x) =>
+  Natural n ->
   (Vec (S n) (OpenGame o c a b x s y r)) ->
   OpenGame o c (CatRepeat (S n) a) (CatRepeat (S n) b)
                (Vec (S n) x) (Vec (S n) s) (Vec (S n) y) (Vec (S n) r)
@@ -100,10 +137,10 @@ population (Succ n) (v :> v' :> vs) =
                             Refl -> let (xs, ys) = unappend @a ls
                                         p1 = play v xs
                                         p2 = play ind ys in
-                                        omap stick split stick split (p1 &&&& p2))
+                                        omap cons uncons cons uncons (p1 &&&& p2))
                (\ls b ->
                  case repeatSuccProof of
                    Refl -> let (xs, ys) = unappend @a ls
-                               g' = gmap stick split stick split (v &&& ind)
-                               gs = omap stick split stick split (play v xs &&&& play ind ys)
+                               g' = gmap cons uncons cons uncons (v &&& ind)
+                               gs = omap cons uncons cons uncons (play v xs &&&& play ind ys)
                             in evaluate g' ls b)

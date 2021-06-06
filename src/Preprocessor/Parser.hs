@@ -19,11 +19,14 @@ uncurry5 f (x, y, z, w, v) = f x y z w v
 lineSep :: String-> Parser ()
 lineSep str = spaces <* string str <* spaces
 
-realParser :: Parser (GameAST Pattern Lambda)
-realParser =  parseBlock parsePattern expr (parseLine parsePattern expr) <* eof
+-- A parser for GameAST
+gameASTParser :: Parser (GameAST Pattern Lambda)
+gameASTParser =  parseBlock parsePattern expr (parseLine parsePattern expr) <* eof
 
+-- parse a string into a GameAST
 parseLambda :: String -> Either ParseError (GameAST Pattern Lambda)
-parseLambda = parse realParser "realParser"
+parseLambda = parse gameASTParser "game AST parser"
 
+-- parse a verbose syntax into a GameAST
 parseVerbose :: String -> Either ParseError (GameAST Pattern Lambda)
 parseVerbose = parse (parseVerboseSyntax parsePattern expr (parseVerboseLine parsePattern expr)) "verbose parser"
