@@ -49,11 +49,26 @@ reindex v u g = OpenGame {
   evaluate = \as c -> case unappend as of (a, a') -> evaluate g a (cmap identity (play h a') c)
                                                   +:+ evaluate h a' (cmap (play g a) identity c)
 }
+
+pick : [*] -> [*] -> [*]
+
 -- TODO: Check if this works
+(+++) :: forall f x1 x2 c o a a' b b' s y1 y2 r.
+         (Show x1, Show x2, Optic o, Context c o, ContextAdd c, Unappend a, Unappend a')
+      => OpenGame o c a b x1 s y1 r -> OpenGame o c a' b' x2 s y2 r
+      -> OpenGame o c (a +:+ a') (b +:+ b') (Either x1 x2) s (Either y1 y2) r
+(+++) g1 g2 = OpenGame
+  (\ls -> case unappend @a @a' ls of (l1, l2) -> let p1 = play g1 l1
+                                                     p2 = play g2 l2
+                                                  in p1 ++++ p2)
+  (\ls body ->
+    case unappend @a @a' ls of
+      (l1, l2) -> either (evaluate (_ g1) l1) undefined (match body))-- either (evaluate g1 l1) (evaluate g2 l2) (match body))
+
 -- (+++) :: forall x1 x2 c o a a' b s y1 y2 r.
 --          (Show x1, Show x2, Optic o, Context c o, ContextAdd c, Unappend a, Unappend a')
---       => OpenGame o c a (b x1 y1) x1 s y1 r -> OpenGame o c a' (b x2 y2) x2 s y2 r
---       -> OpenGame o c (a +:+ a') (b (Either x1 x2) (Either y1 y2)) (Either x1 x2) s (Either y1 y2) r
+--       => OpenGame o c a b x1 s y1 r -> OpenGame o c a' b x2 s y2 r
+--       -> OpenGame o c (a +:+ a') b (Either x1 x2) s (Either y1 y2) r
 -- (+++) g1 g2 = OpenGame
 --   (\ls -> case unappend @a @a' ls of (l1, l2) -> let p1 = play g1 l1
 --                                                      p2 = play g2 l2
@@ -61,18 +76,6 @@ reindex v u g = OpenGame {
 --   (\ls body ->
 --     case unappend @a @a' ls of
 --       (l1, l2) -> either (evaluate g1 l1) (evaluate g2 l2) (match body))
---
-(+++) :: forall x1 x2 c o a a' b s y1 y2 r.
-         (Show x1, Show x2, Optic o, Context c o, ContextAdd c, Unappend a, Unappend a')
-      => OpenGame o c a b x1 s y1 r -> OpenGame o c a' b x2 s y2 r
-      -> OpenGame o c (a +:+ a') b (Either x1 x2) s (Either y1 y2) r
-(+++) g1 g2 = OpenGame
-  (\ls -> case unappend @a @a' ls of (l1, l2) -> let p1 = play g1 l1
-                                                     p2 = play g2 l2
-                                                  in p1 ++++ p2)
-  (\ls body ->
-    case unappend @a @a' ls of
-      (l1, l2) -> either (evaluate g1 l1) (evaluate g2 l2) (match body))
 
 (&&&) :: (Optic o, Context c o, Unappend a, Unappend b, Show x, Show x')
       => OpenGame o c a b x s y r -> OpenGame o c a' b' x' s' y' r'
