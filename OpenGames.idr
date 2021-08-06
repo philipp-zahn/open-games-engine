@@ -17,22 +17,26 @@ interface Optic (0 o : Type -> Type -> Type -> Type -> Type) where
   (>>>>) : o s t a b -> o a b p q -> o s t p q
   (&&&&) : o s1 t1 a1 b1 -> o s2 t2 a2 b2 -> o (s1, s2) (t1, t2) (a1, a2) (b1, b2)
   (++++) : o s1 t a1 b -> o s2 t a2 b -> o (Either s1 s2) t (Either a1 a2) b
-  -- Match :  o (Either s1 s2) t (Either a1 a2) b ->
 
 identity : (Optic o) => o s t s t
 identity = lens id (flip const)
 
 interface (Optic o) => Context (0 c, o : Type -> Type -> Type -> Type -> Type) where
-  cmap : o s1 t1 a1 t2 -> o a1 b1 a2 b2 -> c s1 t1 a1 b2 -> c s2 t2 a1 b1
+  cmap : o s1 t1 s2 t2 -> o a1 b1 a2 b2 -> c s1 t1 a2 b2 -> c s2 t2 a1 b1
   (//) : o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
   (\\) : o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
 
 interface ContextAdd (0 c : Type -> Type -> Type -> Type -> Type) where
   match : c (Either x1 x2) s (Either y1 y2) r -> Either (c x1 s y1 r) (c x2 s y2 r)
+  both : c (x, x') (s, s') (y, y') (r, r') -> (c x s y r, c x' s' y' r')
 
 data TypeList : List Type -> Type where
   Nil : TypeList []
   (::) : (ty : Type) -> TypeList ts -> TypeList (ty :: ts)
+
+FromList : (ls : List Type) -> TypeList ls
+FromList [] = []
+FromList (x :: xs) = x :: FromList xs
 
 record OpenGame (o, c : Type -> Type -> Type -> Type -> Type)
                 (a : List Type)
@@ -63,14 +67,34 @@ choice : (select : Bool) -> (b : TypeList ks) -> (b' : TypeList ks')
 choice True b b' = b
 choice False b b' = b'
 
--- composeTy : Context c o => (c x s y r -> List Type) -> (c y r z q -> List Type) -> c x s z q -> List Type
--- composeTy f g w = f (cmap {c} {o} ?f1 ?f2 w) ++ g ?rest
+sequenceTy : Optic o => Context c o 
+         => o x s y r -> o y r z q 
+	 -> (c x s y r -> List Type) 
+	 -> (c y r z q -> List Type) 
+	 -> (c x s z q -> List Type)
+sequenceTy o1 o2 f g w = f (cmap {o} identity o2 w)
+                     ++ g (cmap {o} o1 identity w)
 
--- (>>>) : {a : _ } -> (Optic o, Context c o)
---       => OpenGame o c a x s y r b -> OpenGame o c a' y r z q b'
---       -> OpenGame o c (a ++ a') x s z q (composeTy {c} {o} b b')
--- (>>>) g h = ?rest4
+TensorTy : {0 c : Type -> Type -> Type -> Type -> Type} ->
+           (c x s y r -> List Type) ->
+	   (c x' s' y' r' -> List Type) ->
+           (c x s y r, c x' s' y' r') ->
+	   List Type
+TensorTy fl fr (l, r) = fl l ++ fr r
 
+-- Sequence operator
+(>>>) : {a, a' : List Type } -> (Optic o, Context c o)
+      => (g1 : OpenGame o c a x s y r b) -> (g2 : OpenGame o c a' y r z q b')
+      -> OpenGame o c (a ++ a') x s z q
+                      (sequenceTy {c} {o} (g1.play (FromList a)) (g2.play (FromList a')) b b')
+(>>>) g1 g2 =
+  MkGame
+    (\tl => case split tl of (left, right) => g1.play left >>>> g2.play right)
+    (\tl, body => case split tl of (left, right) => let v1 = g1.evaluate left (cmap {c} {o} identity (g2.play (FromList a')) body)
+                                                        v2 = g2.evaluate right (cmap {c} {o} (g1.play (FromList a)) identity body)
+                                                     in v1 ++ v2)
+
+-- Choice operator
 (+++) : {a : _} -> Optic o => Context c o => ContextAdd c
      => (a, a' : List Type)
      -> (g1 : OpenGame o c a x1 s y1 r b) -> (g2 : OpenGame o c a' x2 s y2 r b')
@@ -87,7 +111,23 @@ choice False b b' = b'
       fn args ctx | (Left x) = g.evaluate (left args) x
       fn args ctx | (Right x) = h.evaluate (right args) x
 
-
+(&&&) : (Optic o, Context c o, ContextAdd c)
+     => {a, a' : List Type}
+     -> {b : c x s y r -> List Type}
+     -> {b' : c x' s' y' r' -> List Type}
+     -> (g1 : OpenGame o c a x s y r b) 
+     -> (g2 : OpenGame o c a' x' s' y' r' b')
+     -> OpenGame o c (a ++ a') (x, x') (s, s') (y, y') (r, r') 
+                     (TensorTy {c} b b' . (OpenGames.both {c}))
+(&&&) g1 g2 = MkGame
+    (\tl => let (l, r) = split tl in g1.play l &&&& g2.play r)
+    eval
+    where
+      eval : TypeList (a ++ a') -> (v : c (x, x') (s, s') (y, y') (r, r'))
+          -> TypeList (TensorTy {c} b b' (both v))
+      eval ty v with (both v)
+        eval ty v | (left, right) = 
+	  let (la, la') = split ty in g1.evaluate la left ++ g2.evaluate la' right
 
 {-
 -}
