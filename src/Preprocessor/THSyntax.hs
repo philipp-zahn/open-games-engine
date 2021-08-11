@@ -2,15 +2,17 @@
 {-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Preprocessor.THSyntax  ( LineWithContext(..)
-                              , SLine
-                              , QLine
-                              , compileBlock
-                              , param
-                              , compileLine
-                              , generateGame
-                              )
-                              where
+module Preprocessor.THSyntax ( LineWithContext(..)
+                             , SLine
+                             , QLine
+                             , compileBlock
+                             , param
+                             , asPat
+                             , compileLine
+                             , generateGame
+                             )
+                             where
+
 import Language.Haskell.TH.Syntax
 import Preprocessor.TH
 import Preprocessor.Types
@@ -37,6 +39,18 @@ instance ToLine Pat Exp where
 instance ToLine String (Q Exp) where
   toLine = compileQLine
 
+class ToExpr blockExpr where
+  toExpr :: blockExpr -> Q Exp
+
+instance ToExpr String where
+  toExpr = pure . VarE . mkName
+
+instance ToExpr Exp where
+  toExpr = pure
+
+instance ToExpr (Q Exp) where
+  toExpr = id
+
 -- The business end of the compiler
 
 compileLine :: LineWithContext p e -> FreeOpenGame p e
@@ -59,7 +73,6 @@ compileBlock block = Sequential (Sequential l1 l2) l3
         l3 = Lens (Lambda covariantBlockContext (Expressions (blockCovariantOutputs block)))
                   (Curry (Multiplex covariantBlockContext (Variables (blockContravariantInputs block))))
 
-
 covariantContexts :: Block p e -> [Variables p]
 covariantContexts block = map f (init (inits (map (Variables . covariantOutputs) (blockLines block))))
   where f contexts = flattenVariables (Variables (blockCovariantInputs block) : contexts)
@@ -78,6 +91,9 @@ linesWithContext block = zipWith3 LineWithContext (blockLines block) (covariantC
 param :: String -> Q Exp
 param = pure . VarE . mkName
 
+asPat :: String -> Q Pat
+asPat = pure . VarP . mkName
+
 compileQLine :: QLine -> Q SLine
 compileQLine qline = do covIn <- traverse id $ covariantInputs qline
                         conIn <- traverse id $ contravariantInputs qline
@@ -85,6 +101,7 @@ compileQLine qline = do covIn <- traverse id $ covariantInputs qline
                         let covOut = fmap (VarP . mkName) (covariantOutputs qline)
                         let conOut = fmap (VarP . mkName) (contravariantOutputs qline)
                         pure $ Line covIn conOut exp covOut conIn
+
 
 class GameCompiler term where
   generateGame :: String -> [String] -> term -> Q [Dec]
@@ -94,6 +111,29 @@ instance GameCompiler (Block Pat Exp) where
     do
        game <- interpretOpenGame (compileBlock block)
        pure $ [FunD (mkName name) [Clause (fmap (VarP . mkName) args) (NormalB game) []]]
+
+extract :: Block (Q p) (Q e) -> Q (Block p e)
+extract (Block covIn conOut lines covOut conIn) =
+  do covIn' <- sequence covIn
+     conOut' <- sequence conOut
+     lines' <- traverse extractLines lines
+     covOut' <- sequence covOut
+     conIn' <- sequence conIn
+     pure (Block covIn' conOut' lines' covOut' conIn')
+  where
+    extractLines :: Line (Q p) (Q e) -> Q (Line p e)
+    extractLines (Line covIn conOut m covOut conIn) = do
+      covIn' <- sequence covIn
+      conOut' <- sequence conOut
+      body <- m
+      covOut' <- sequence covOut
+      conIn' <- sequence conIn
+      pure (Line covIn' conOut' body covOut' conIn')
+
+instance GameCompiler (Block (Q Pat) (Q Exp)) where
+  generateGame name args block =
+    extract block >>=
+    generateGame name args
 
 instance GameCompiler (Block String (Q Exp)) where
   generateGame name args block = do
