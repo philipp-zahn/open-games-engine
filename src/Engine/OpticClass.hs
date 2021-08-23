@@ -1,31 +1,55 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE PolyKinds             #-}
+{-# LANGUAGE DefaultSignatures     #-}
 
-module Engine.OpticClass
-  ( Stochastic(..)
-  , Vector(..)
-  , StochasticStatefulOptic(..)
-  , StochasticStatefulContext(..)
-  , Optic(..)
-  , Precontext(..)
-  , Context(..)
-  , ContextAdd(..)
-  , identity
-  ) where
+module Engine.OpticClass where
+--   ( Optic(..)
+--   , Choice(..)
+--   , Precontext(..)
+--   , Context(..)
+--   , ContextAdd(..)
+--   , identity
+--   ) where
 
 
 import           Control.Monad.State                hiding (state)
-import           Numeric.Probability.Distribution   hiding (lift)
+-- import           Numeric.Probability.Distribution   hiding (lift)
 import           Data.Maybe
+import Data.Kind (Type)
+import Data.Singletons
+import Data.Singletons.TH
+
+$(singletons [d|
+    data Choice a b = Choice1 a | Choice2 b
+
+    pick :: (a -> c) -> (b -> c) -> Choice a b -> c
+    pick f _ (Choice1 a) = f a
+    pick _ g (Choice2 b) = g b
+
+    data Option a = Some a | None
+
+    extract :: b -> (a -> b) -> Option a -> b
+    extract def f (Some a) = f a
+    extract def f None = def
+    |])
 
 class Optic o where
   lens :: (s -> a) -> (s -> b -> t) -> o s t a b
   (>>>>) :: o s t a b -> o a b p q -> o s t p q
   (&&&&) :: o s1 t1 a1 b1 -> o s2 t2 a2 b2 -> o (s1, s2) (t1, t2) (a1, a2) (b1, b2)
-  (++++) :: o s1 t a1 b -> o s2 t a2 b -> o (Either s1 s2) t (Either a1 a2) b
+  (++++) :: o s1 t a1 b -> o s2 t a2 b -> o (Choice s1 s2) t (Choice a1 a2) b
 
 identity :: (Optic o) => o s t s t
 identity = lens id (flip const)
@@ -47,13 +71,20 @@ class (Optic o, Precontext c) => Context c o where
 -- ContextAdd is a separate class to Precontext and Context because its implementation is more ad-hoc,
 -- eg. it can't be done generically in a monad
 
-class ContextAdd c where
-  prl :: c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s1 t a1 b)
-  prr :: c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s2 t a2 b)
-  match :: c (Either s1 s2) t (Either a1 a2) b -> Either (c s1 t a1 b) (c s2 t a2 b)
-  match o = maybe (maybe (error "malformed lens +++") Right (prr o))
-                                                      Left (prl o)
+$(singletons [d|
+  class ContextAdd c where
+    prl :: c (Choice s1 s2) t (Choice a1 a2) b -> Option (c s1 t a1 b)
+    prr :: c (Choice s1 s2) t (Choice a1 a2) b -> Option (c s2 t a2 b)
+    match :: c (Choice s1 s2) t (Choice a1 a2) b -> Choice (c s1 t a1 b) (c s2 t a2 b)
+    both :: c (x, x') (s, s') (y, y') (r, r') -> (c x s y r, c x' s' y' r')|])
+$(promote [d|
+  choiceTy :: forall c x1 s y1 r x2 y2.
+              ContextAdd c => (c x1 s y1 r -> [Type])
+                           -> (c x2 s y2 r -> [Type])
+                           -> c (Choice x1 x2) s (Choice y1 y2) r -> [Type] 
+  choiceTy f g ctx = pick f g (match ctx)|])
 
+{-
 -------------------------------------------------------------
 --- replicate the old implementation of a stochastic context
 type Stochastic = T Double
@@ -108,3 +139,4 @@ instance ContextAdd StochasticStatefulContext where
        in if null fs then Nothing
                      else Just (StochasticStatefulContext (fromFreqs fs) (\z a2 -> k z (Right a2)))
 
+-}

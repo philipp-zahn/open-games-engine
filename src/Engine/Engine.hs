@@ -22,6 +22,8 @@ module Engine.Engine
   , generateOutput
   , generateIsEq
   , OpenGame(..)
+  , play
+  , evaluate
   , lift
   , reindex
   , (>>>)
