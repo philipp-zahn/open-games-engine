@@ -13,7 +13,7 @@ packages:
     hackage: probability-0.2.6@sha256:6d85d961d85fd5d1a35b90fe77510f6fcc6a8f20e8ed503219c38378de9cb3cd,2857
 snapshots:
 - completed:
-    size: 489011
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/15/1.yaml
-    sha256: d4ecc42b7125d68e4c3c036a08046ad0cd02ae0d9efbe3af2223a00ff8cc16f3
-  original: lts-15.1
+    size: 575892
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2021/8/15.yaml
+    sha256: 85e42d245dd29a6f63b0fd43ac6b08475a24d50c9a3a828eb2dcae1bb630a25d
+  original: nightly-2021-08-15

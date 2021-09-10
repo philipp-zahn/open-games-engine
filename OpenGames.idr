@@ -27,7 +27,8 @@ interface (Optic o) => Context (0 c, o : Type -> Type -> Type -> Type -> Type) w
   (\\) : o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
 
 interface ContextAdd (0 c : Type -> Type -> Type -> Type -> Type) where
-  match : c (Either x1 x2) s (Either y1 y2) r -> Either (c x1 s y1 r) (c x2 s y2 r)
+  match : c (Either x1 x2) s (Either y1 y2) r 
+       -> Either (c x1 s y1 r) (c x2 s y2 r)
   both : c (x, x') (s, s') (y, y') (r, r') -> (c x s y r, c x' s' y' r')
 
 data TypeList : List Type -> Type where
@@ -67,26 +68,26 @@ choice : (select : Bool) -> (b : TypeList ks) -> (b' : TypeList ks')
 choice True b b' = b
 choice False b b' = b'
 
-sequenceTy : Optic o => Context c o 
+SequenceTy : Optic o => Context c o 
          => o x s y r -> o y r z q 
 	 -> (c x s y r -> List Type) 
 	 -> (c y r z q -> List Type) 
 	 -> (c x s z q -> List Type)
-sequenceTy o1 o2 f g w = f (cmap {o} identity o2 w)
+SequenceTy o1 o2 f g w = f (cmap {o} identity o2 w)
                      ++ g (cmap {o} o1 identity w)
 
 TensorTy : {0 c : Type -> Type -> Type -> Type -> Type} ->
            (c x s y r -> List Type) ->
-	   (c x' s' y' r' -> List Type) ->
+	         (c x' s' y' r' -> List Type) ->
            (c x s y r, c x' s' y' r') ->
-	   List Type
+	         List Type
 TensorTy fl fr (l, r) = fl l ++ fr r
 
 -- Sequence operator
 (>>>) : {a, a' : List Type } -> (Optic o, Context c o)
       => (g1 : OpenGame o c a x s y r b) -> (g2 : OpenGame o c a' y r z q b')
       -> OpenGame o c (a ++ a') x s z q
-                      (sequenceTy {c} {o} (g1.play (FromList a)) (g2.play (FromList a')) b b')
+                      (SequenceTy {c} {o} (g1.play (FromList a)) (g2.play (FromList a')) b b')
 (>>>) g1 g2 =
   MkGame
     (\tl => case split tl of (left, right) => g1.play left >>>> g2.play right)

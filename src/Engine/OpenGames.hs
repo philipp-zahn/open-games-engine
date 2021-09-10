@@ -42,21 +42,24 @@ import Data.Kind (Type)
 import Data.Singletons 
 import Data.Singletons.TH as STH
 
+import Unsafe.Coerce
 
 data OpenGame (o :: Type -> Type -> Type -> Type -> Type) 
               (c :: Type -> Type -> Type -> Type -> Type) 
 	      (a :: [Type]) 
 	      (x :: Type) (s :: Type) 
 	      (y :: Type) (r :: Type)
-	      (b :: c x s y r -> [Type])
+	      (b :: c x s y r ~> [Type])
 	      where
   OpenGame :: (TLL.List a -> o x s y r) 
-           -> (TLL.List a -> Sing (ctx :: c x s y r) -> TLL.List (b ctx))
+           -> (forall ctx. TLL.List a -> Sing (ctx :: c x s y r) -> TLL.List (b @@ ctx))
 	   -> OpenGame o c a x s y r b
 
 play :: OpenGame o c a x s y r b -> TLL.List a -> o x s y r
 play (OpenGame p _) = p
 
+evaluate :: OpenGame o c a x s y r b -> TLL.List a -> Sing (ctx :: c x s y r) -> TLL.List (b @@ ctx)
+evaluate (OpenGame _ e) ls sng = e ls sng
 
 
 (+++) :: forall x1
@@ -68,20 +71,20 @@ play (OpenGame p _) = p
                 s
                 y1
                 r
-                (b :: c x1 s y1 r -> [Type])
+                (b :: c x1 s y1 r ~> [Type])
                 y2
-                (b' :: c x2 s y2 r -> [Type]).
+                (b' :: c x2 s y2 r ~> [Type]).
          (Show x1, Show x2, Optic o, Context c o, ContextAdd c, TLL.Unappend a, TLL.Unappend a')
       => OpenGame o c a x1 s y1 r b -> OpenGame o c a' x2 s y2 r b'
-      -> OpenGame o c (a TLL.+:+ a') (Choice x1 x2) s (Choice y1 y2) r (ChoiceTySym2 @c @x1 @s @y1 @r @x2 @y2 (TyCon1 b) (TyCon1 b'))
-(+++) = undefined
--- (+++) g1 g2 = OpenGame
---   (\ls -> case unappend @a @a' ls of (l1, l2) -> let p1 = play g1 l1
---                                                      p2 = play g2 l2
---                                                   in p1 ++++ p2)
---   (\ls body ->
---     case unappend @a @a' ls of
---       (l1, l2) -> either (evaluate g1 l1) (evaluate g2 l2) (match body))
+      -> OpenGame o c (a TLL.+:+ a') (Choice x1 x2) s (Choice y1 y2) r (ChoiceTySym2 @c @x1 @s @y1 @r @x2 @y2 b b')
+(+++) g1 g2 = 
+  OpenGame 
+    (\ls -> case TLL.unappend @a @a' ls of (l1, l2) -> let p1 = play g1 l1
+                                                           p2 = play g2 l2
+                                                        in p1 ++++ p2)
+    (\ls body ->
+      case TLL.unappend @a @a' ls of
+        (l1, l2) -> pick (evaluate g1 l1) (evaluate g2 l2) (match (FromSing body)))-- pick (evaluate g1 l1) (evaluate g2 l2) (match body))
 
 {-
 -- evaluate :: OpenGame o c a x s y r b -> (List a -> Sing (ctx :: c x s y r) -> List (b ctx))
