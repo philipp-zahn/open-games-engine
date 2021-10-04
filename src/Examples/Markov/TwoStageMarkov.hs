@@ -14,7 +14,7 @@ import           Examples.SimultaneousMoves (ActionPD(..), Location(..))
 import           Control.Monad.State  hiding (state,void)
 import qualified Control.Monad.State  as ST
 
-import Numeric.Probability.Distribution hiding (map, lift, filter)
+import Numeric.Probability.Distribution.Observable hiding (map, lift, filter)
 
 
 

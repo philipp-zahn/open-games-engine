@@ -9,6 +9,7 @@ module Examples.Staking.AndGateMarkov where
 
 import           Debug.Trace
 import           Engine.Engine
+import           Numeric.Probability.Distribution.Observable
 import           Preprocessor.Preprocessor
 
 import           Control.Monad.State  hiding (state,void)
@@ -298,13 +299,19 @@ extractNextState2 (StochasticStatefulOptic v _) x = do
   pure a
 
 -- Random prior indpendent of previous moves
-determineContinuationPayoffs parameters 1        strat action = pure ()
 determineContinuationPayoffs parameters iterator strat action = do
-   trace ",,1" (pure ())
-   extractContinuation executeStrat action
-   nextInput <- ST.lift $ andGateTestPrior
-   determineContinuationPayoffs parameters (pred iterator) strat nextInput
- where executeStrat =  play (andGateGame parameters) strat
+  ST.lift $ note "determineContinuationPayoffs"
+  go parameters iterator strat action
+  where
+    go parameters 1 strat action = ST.lift $ note "go[1]"
+    go parameters iterator strat action = do
+      ST.lift $ note ("go[" ++ show iterator ++ "]")
+      extractContinuation executeStrat action
+      ST.lift $ note "andGateTestPrior"
+      nextInput <- ST.lift $ andGateTestPrior
+      go parameters (pred iterator) strat nextInput
+      where
+        executeStrat = play (andGateGame parameters) strat
 
 -- Actual moves affect next moves
 determineContinuationPayoffs' parameters 1        strat action = pure ()
