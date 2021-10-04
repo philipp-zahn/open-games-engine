@@ -56,7 +56,8 @@ dependencies:
     - haskeline
     - hashmap
     - hashable
-    - extra 
+    - extra
+    - bytestring
 
 executables:
   open-games-exe:
@@ -81,4 +82,3 @@ benchmarks:
     dependencies:
       - open-games-hs
       - criterion
-
