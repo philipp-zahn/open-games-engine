@@ -135,12 +135,12 @@ observeT = flip runReaderT 0 . go
           pure (I.decons (I.mapMaybe f (I.fromFreqs as')))
         Note _c no -> do
           output ("Note: " <> S8.pack no)
-          pure []
+          pure [((),1)]
     _smallCs c =
       case getCallStack c of
         [] -> "(no call stack)"
         ((_, srcloc):_) -> prettySrcLoc srcloc
     output s = do
       i <- ask
-      -- lift (S8.putStrLn (S8.replicate i ' ' <> s))
+      lift (S8.putStrLn (S8.replicate i ' ' <> s))
       pure ()
