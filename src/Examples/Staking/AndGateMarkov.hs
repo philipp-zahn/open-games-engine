@@ -32,7 +32,7 @@ andGateMarkovTestParams = AndGateMarkovParams {
     penalty = 0.5,
     minDeposit = 0.0,
     maxDeposit = 10.0,
-    incrementDeposit = 0.1,
+    incrementDeposit = 0.5,
     epsilon = 0.001,
     discountFactor = 0.5
 }
@@ -299,9 +299,9 @@ extractNextState2 (StochasticStatefulOptic v _) x = do
   pure a
 
 -- Random prior indpendent of previous moves
-determineContinuationPayoffs parameters iterator strat action = do
+determineContinuationPayoffs parameters0 iterator0 strat0 action0 = do
   ST.lift $ note "determineContinuationPayoffs"
-  go parameters iterator strat action
+  go parameters0 iterator0 strat0 action0
   where
     go parameters 1 strat action = ST.lift $ note "go[1]"
     go parameters iterator strat action = do
@@ -312,6 +312,13 @@ determineContinuationPayoffs parameters iterator strat action = do
       go parameters (pred iterator) strat nextInput
       where
         executeStrat = play (andGateGame parameters) strat
+
+determineContinuationPayoffs_ parameters 1        strat action = pure ()
+determineContinuationPayoffs_ parameters iterator strat action = do
+   extractContinuation executeStrat action
+   nextInput <- ST.lift $ andGateTestPrior
+   determineContinuationPayoffs parameters (pred iterator) strat nextInput
+ where executeStrat =  play (andGateGame parameters) strat
 
 -- Actual moves affect next moves
 determineContinuationPayoffs' parameters 1        strat action = pure ()

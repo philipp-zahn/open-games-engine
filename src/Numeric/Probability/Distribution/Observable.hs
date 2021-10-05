@@ -142,4 +142,5 @@ observeT = flip runReaderT 0 . go
         ((_, srcloc):_) -> prettySrcLoc srcloc
     output s = do
       i <- ask
-      lift (S8.putStrLn (S8.replicate i ' ' <> s))
+      -- lift (S8.putStrLn (S8.replicate i ' ' <> s))
+      pure ()
