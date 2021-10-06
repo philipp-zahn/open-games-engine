@@ -103,7 +103,7 @@ observeT = flip runReaderT 0 . go
       \case
         Bind m f -> do
           {-output "Bind-LHS"-}
-          xps <- local (+ 2) (go m)
+          xps <- {-local (+ 2) -}(go m)
           if null xps
             then do
               {-output "LHS was null"-}
@@ -111,12 +111,13 @@ observeT = flip runReaderT 0 . go
             else do
               {-output "Bind-RHS"-}
               yqps <-
-                local
-                  (+ 2)
+                -- local
+                --   (+ 2)
                   (traverse
                      (\(_i, (x, p)) -> do
                         {-output ("RHS[" <> S8.pack (show i) <> "]")-}
-                        yqs <- local (+ 2) (go (f x))
+                        yqs <- -- local (+ 2)
+                          (go (f x))
                         pure (map (\(y, q) -> (y, q * p)) yqs))
                      (zip [1 :: Int ..] xps))
               pure (concat yqps)
@@ -135,7 +136,7 @@ observeT = flip runReaderT 0 . go
           pure (I.decons (I.mapMaybe f (I.fromFreqs as')))
         Note _c no -> do
           output ("Note: " <> S8.pack no)
-          pure []
+          pure [((),1)]
     _smallCs c =
       case getCallStack c of
         [] -> "(no call stack)"
@@ -143,3 +144,4 @@ observeT = flip runReaderT 0 . go
     output s = do
       i <- ask
       lift (S8.putStrLn (S8.replicate i ' ' <> s))
+      pure ()
