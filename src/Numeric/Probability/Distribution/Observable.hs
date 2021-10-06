@@ -103,7 +103,7 @@ observeT = flip runReaderT 0 . go
       \case
         Bind m f -> do
           {-output "Bind-LHS"-}
-          xps <- {-local (+ 2) -}(go m)
+          xps <- local (+ 2) (go m)
           if null xps
             then do
               {-output "LHS was null"-}
@@ -111,13 +111,12 @@ observeT = flip runReaderT 0 . go
             else do
               {-output "Bind-RHS"-}
               yqps <-
-                -- local
-                --   (+ 2)
+                local
+                  (+ 2)
                   (traverse
                      (\(_i, (x, p)) -> do
                         {-output ("RHS[" <> S8.pack (show i) <> "]")-}
-                        yqs <- -- local (+ 2)
-                          (go (f x))
+                        yqs <- local (+ 2) (go (f x))
                         pure (map (\(y, q) -> (y, q * p)) yqs))
                      (zip [1 :: Int ..] xps))
               pure (concat yqps)
