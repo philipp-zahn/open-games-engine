@@ -9,14 +9,11 @@ module Examples.Staking.AndGateMarkov where
 
 import           Debug.Trace
 import           Engine.Engine
+import           Numeric.Probability.Distribution.Observable
 import           Preprocessor.Preprocessor
 
-import           Control.Monad.State  hiding (state,void)
-import qualified Control.Monad.State  as ST
-
-
--- TODO change the structure of the continuation iteration
--- DONE What effect happens through the state hack and the discounting? The discounting at least does not seem to make a difference.
+import           Control.Monad.State hiding (state,void)
+import qualified Control.Monad.State as ST
 
 --------
 -- Types
@@ -31,7 +28,7 @@ andGateMarkovTestParams = AndGateMarkovParams {
     penalty = 0.5,
     minDeposit = 0.0,
     maxDeposit = 10.0,
-    incrementDeposit = 0.1,
+    incrementDeposit = 2,
     epsilon = 0.001,
     discountFactor = 0.5
 }
@@ -298,9 +295,22 @@ extractNextState2 (StochasticStatefulOptic v _) x = do
   pure a
 
 -- Random prior indpendent of previous moves
-determineContinuationPayoffs parameters 1        strat action = pure ()
 determineContinuationPayoffs parameters iterator strat action = do
-   trace ",,1" (pure ())
+  ST.lift $ note "determineContinuationPayoffs"
+  go parameters iterator strat action
+  where
+    go parameters 1 strat action = ST.lift $ note "go[1]"
+    go parameters iterator strat action = do
+      ST.lift $ note ("go[" ++ show iterator ++ "]")
+      extractContinuation executeStrat action
+      ST.lift $ note "andGateTestPrior"
+      nextInput <- ST.lift $ andGateTestPrior
+      go parameters (pred iterator) strat nextInput
+      where
+        executeStrat = play (andGateGame parameters) strat
+
+determineContinuationPayoffs_ parameters 1        strat action = pure ()
+determineContinuationPayoffs_ parameters iterator strat action = do
    extractContinuation executeStrat action
    nextInput <- ST.lift $ andGateTestPrior
    determineContinuationPayoffs parameters (pred iterator) strat nextInput

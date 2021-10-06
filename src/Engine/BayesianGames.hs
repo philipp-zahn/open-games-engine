@@ -36,7 +36,7 @@ import           Data.HashMap                       as HM hiding (null,map,mapMa
 import Data.List (maximumBy)
 import Data.Ord (comparing)
 import           Data.Utils
-import Numeric.Probability.Distribution hiding (map, lift, filter)
+import Numeric.Probability.Distribution.Observable hiding (map, lift, filter)
 
 import Engine.OpenGames hiding (lift)
 import Engine.OpticClass

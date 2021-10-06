@@ -21,7 +21,7 @@ module Engine.OpticClass
 
 import           Control.Monad.State                hiding (state)
 import           Data.HashMap                       as HM hiding (null,map,mapMaybe)
-import           Numeric.Probability.Distribution   hiding (lift)
+import           Numeric.Probability.Distribution.Observable   hiding (lift)
 
 class Optic o where
   lens :: (s -> a) -> (s -> b -> t) -> o s t a b
