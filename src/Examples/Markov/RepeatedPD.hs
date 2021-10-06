@@ -27,7 +27,7 @@ prisonersDilemma  :: OpenGame
                               ()
                               (ActionPD, ActionPD)
                               ()
-discountFactor = 0.5
+discountFactor = 0.9
 
 prisonersDilemma = [opengame|
 
@@ -68,6 +68,15 @@ stageStrategy = Kleisli $
 -- Stage strategy tuple
 strategyTuple = stageStrategy ::- stageStrategy ::- Nil
 
+stageStrategy' :: Kleisli Stochastic (ActionPD, ActionPD) ActionPD
+stageStrategy' = Kleisli $
+   (\case
+       (Cooperate,Cooperate) -> uniformDist [Cooperate,Defect]
+       (_,_)         -> uniformDist [Cooperate,Defect])
+-- Stage strategy tuple
+strategyTuple' = stageStrategy ::- stageStrategy ::- Nil
+
+
 
 -- extract continuation
 extractContinuation :: StochasticStatefulOptic s () a () -> s -> StateT Vector Stochastic ()
@@ -85,22 +94,39 @@ executeStrat strat =  play prisonersDilemma strat
 
 
 -- determine continuation for iterator, with the same repeated strategy
-determineContinuationPayoffs :: Integer
+determineContinuationPayoffs__ :: Integer
                              -> List
                                       '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
                                         Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
                              -> (ActionPD,ActionPD)
                              -> StateT Vector Stochastic ()
-determineContinuationPayoffs 1        strat action = pure ()
-determineContinuationPayoffs iterator strat action = do
+determineContinuationPayoffs__ 1        strat action = pure ()
+determineContinuationPayoffs__ iterator strat action = do
    extractContinuation executeStrat action
    nextInput <- ST.lift $ extractNextState executeStrat action
-   determineContinuationPayoffs (pred iterator) strat nextInput
+   determineContinuationPayoffs__ (pred iterator) strat nextInput
  where executeStrat =  play prisonersDilemma strat
 
 
+-- Random prior indpendent of previous moves
+determineContinuationPayoffs  iterator strat action = do
+  ST.lift $ note "determineContinuationPayoffs"
+  go  iterator strat action
+  where
+    go  1 strat action = ST.lift $ note "go[1]"
+    go  iterator strat action = do
+      ST.lift $ note ("go[" ++ show iterator ++ "]")
+      extractContinuation executeStrat action
+      ST.lift $ note "nextState"
+      nextInput <- ST.lift $ extractNextState executeStrat action
+      go (pred iterator) strat nextInput
+      where
+        executeStrat = play prisonersDilemma strat
+
+
+
 -- fix context used for the evaluation
-contextCont iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> trace ",,1" (determineContinuationPayoffs iterator strat action))
+contextCont iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> determineContinuationPayoffs iterator strat action)
 
 
 
@@ -112,3 +138,8 @@ repeatedPDEq iterator strat initialAction = evaluate prisonersDilemma strat cont
 
 
 eqOutput iterator strat initialAction = generateIsEq $ repeatedPDEq iterator strat initialAction
+
+
+testEq iterator = eqOutput iterator strategyTuple (Cooperate,Cooperate)
+
+testEq' iterator = eqOutput iterator strategyTuple' (Cooperate,Cooperate)
