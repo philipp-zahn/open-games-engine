@@ -14,6 +14,7 @@ import           Preprocessor.Preprocessor
 
 import           Control.Monad.State hiding (state,void)
 import qualified Control.Monad.State as ST
+
 --------
 -- Types
 andGateMarkovTestParams = AndGateMarkovParams {
@@ -27,7 +28,7 @@ andGateMarkovTestParams = AndGateMarkovParams {
     penalty = 0.5,
     minDeposit = 0.0,
     maxDeposit = 10.0,
-    incrementDeposit = 0.5,
+    incrementDeposit = 2,
     epsilon = 0.001,
     discountFactor = 0.5
 }
