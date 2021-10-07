@@ -59,6 +59,9 @@ dependencies:
     - hashable
     - extra
     - bytestring
+    - mwc-random
+    - vector
+    - random
 
 executables:
   open-games-exe:
