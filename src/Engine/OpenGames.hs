@@ -39,27 +39,29 @@ import Engine.Vec as Vec
 import Engine.Nat
 import Data.Type.Equality ((:~:)(..))
 import Data.Kind (Type)
-import Data.Singletons 
+import Data.Singletons
 import Data.Singletons.TH as STH
 
 import Unsafe.Coerce
 
-data OpenGame (o :: Type -> Type -> Type -> Type -> Type) 
-              (c :: Type -> Type -> Type -> Type -> Type) 
-	      (a :: [Type]) 
-	      (x :: Type) (s :: Type) 
-	      (y :: Type) (r :: Type)
-	      (b :: c x s y r ~> [Type])
-	      where
-  OpenGame :: (TLL.List a -> o x s y r) 
-           -> (forall ctx. TLL.List a -> Sing (ctx :: c x s y r) -> TLL.List (b @@ ctx))
-	   -> OpenGame o c a x s y r b
+data OpenGame (o :: Type -> Type -> Type -> Type -> Type)
+              (c :: Type -> Type -> Type -> Type -> Type)
+              (a :: [Type])
+              (x :: Type) (s :: Type)
+              (y :: Type) (r :: Type)
+              (b :: c x s y r ~> [Type])
+    where
+  OpenGame :: { play :: (TLL.List a -> o x s y r)
+              , eval :: (forall ctx. TLL.List a -> Sing (ctx :: c x s y r) -> TLL.List (b @@ ctx))
+              } -> OpenGame o c a x s y r b
 
+{-
 play :: OpenGame o c a x s y r b -> TLL.List a -> o x s y r
 play (OpenGame p _) = p
 
-evaluate :: OpenGame o c a x s y r b -> TLL.List a -> Sing (ctx :: c x s y r) -> TLL.List (b @@ ctx)
-evaluate (OpenGame _ e) ls sng = e ls sng
+evaluate :: OpenGame o c a x s y r b -> TLL.List a -> SingFunction2 b -- Sing (ctx :: c x s y r) -> TLL.List (b @@ ctx)
+evaluate (OpenGame _ e) ls sng = let f = e ls in _ -- e ls sng
+-}
 
 
 (+++) :: forall x1
@@ -74,36 +76,38 @@ evaluate (OpenGame _ e) ls sng = e ls sng
                 (b :: c x1 s y1 r ~> [Type])
                 y2
                 (b' :: c x2 s y2 r ~> [Type]).
-         (Show x1, Show x2, Optic o, Context c o, ContextAdd c, TLL.Unappend a, TLL.Unappend a')
+         (Show x1, Show x2, Optic o, Context c o, ContextAdd c, TLL.Unappend a, TLL.Unappend a', SContextAdd c, SingKind (c (Choice x1 x2) s (Choice y1 y2) r))
       => OpenGame o c a x1 s y1 r b -> OpenGame o c a' x2 s y2 r b'
       -> OpenGame o c (a TLL.+:+ a') (Choice x1 x2) s (Choice y1 y2) r (ChoiceTySym2 @c @x1 @s @y1 @r @x2 @y2 b b')
-(+++) g1 g2 = 
-  OpenGame 
+(+++) g1 g2 =
+  OpenGame
     (\ls -> case TLL.unappend @a @a' ls of (l1, l2) -> let p1 = play g1 l1
                                                            p2 = play g2 l2
                                                         in p1 ++++ p2)
     (\ls body ->
       case TLL.unappend @a @a' ls of
-        (l1, l2) -> pick (evaluate g1 l1) (evaluate g2 l2) (match (FromSing body)))-- pick (evaluate g1 l1) (evaluate g2 l2) (match body))
+        (l1, l2) -> _)
+                        -- pick (evaluate g1 l1) (evaluate g2 l2) (match (FromSing body)))-- pick (evaluate g1 l1) (evaluate g2 l2) (match body))
 
 {-
+--
 -- evaluate :: OpenGame o c a x s y r b -> (List a -> Sing (ctx :: c x s y r) -> List (b ctx))
 -- evaluate (OpenGame _ e) = _
 
 -- (>>>) :: (Optic o, Context c o, Unappend a, Unappend b)
---       => OpenGame o c a x s y r b -> OpenGame o c a' y r z q b' 
+--       => OpenGame o c a x s y r b -> OpenGame o c a' y r z q b'
 --       -> OpenGame o c (a +:+ a') x s z q (b +:+ b')
--- (>>>) g h = OpenGame 
+-- (>>>) g h = OpenGame
 --   (\as -> case unappend as of (a, a') -> play g a >>>> play h a')
 --   (\as c -> case unappend as of (a, a') -> evaluate g a (cmap identity (play h a') c)
 --                                        +:+ evaluate h a' (cmap (play g a) identity c))
 
 -- Idris version
--- 
--- SequenceTy : Optic o => Context c o 
---          => o x s y r -> o y r z q 
--- 	 -> (c x s y r -> List Type) 
--- 	 -> (c y r z q -> List Type) 
+--
+-- SequenceTy : Optic o => Context c o
+--          => o x s y r -> o y r z q
+-- 	 -> (c x s y r -> List Type)
+-- 	 -> (c y r z q -> List Type)
 -- 	 -> (c x s z q -> List Type)
 -- SequenceTy o1 o2 f g w = f (cmap {o} identity o2 w)
 --                       ++ g (cmap {o} o1 identity w)
@@ -120,7 +124,7 @@ evaluate (OpenGame _ e) ls sng = e ls sng
 
 
 lift :: o x s y r -> OpenGame o c '[] x s y r (Const )
-lift o = OpenGame 
+lift o = OpenGame
   (\Nil -> o)
   (\Nil _ -> Nil)
 
@@ -157,7 +161,7 @@ reindex v u g = OpenGame
 --       (l1, l2) -> either (evaluate g1 l1) (evaluate g2 l2) (match body))
 
 (&&&) :: (Optic o, Context c o, Unappend a, Unappend b, Show x, Show x')
-      => OpenGame o c a x s y r b -> OpenGame o c a' x' s' y' r' b' 
+      => OpenGame o c a x s y r b -> OpenGame o c a' x' s' y' r' b'
       -> OpenGame o c (a +:+ a') (x, x') (s, s') (y, y') (r, r') (b +:+ b')
 (&&&) g h = OpenGame
   {- play: -} (\as -> case unappend as of (a, a') -> play g a &&&& play h a')
@@ -189,7 +193,7 @@ gmap f1 f2 f3 f4 (OpenGame p e) =
 
 
 pop1 :: forall o c a b x s y r. (Optic o, Context c o) => OpenGame o c a x s y r b ->
-  OpenGame o c (CatRepeat (S Z) a) 
+  OpenGame o c (CatRepeat (S Z) a)
                (Vec (S Z) x) (Vec (S Z) s) (Vec (S Z) y) (Vec (S Z) r)
                (CatRepeat (S Z) b)
 pop1 game =
@@ -210,7 +214,7 @@ population :: forall o c a b x s y r n.
   (Optic o, Context c o, Unappend a, Unappend b, Show x) =>
   Natural n ->
   (Vec (S n) (OpenGame o c a x s y r b)) ->
-  OpenGame o c (CatRepeat (S n) a) 
+  OpenGame o c (CatRepeat (S n) a)
                (Vec (S n) x) (Vec (S n) s) (Vec (S n) y) (Vec (S n) r)
                (CatRepeat (S n) b)
 population Zero (v :> Empty) = pop1 v

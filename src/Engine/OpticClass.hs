@@ -64,24 +64,17 @@ class (Optic o, Precontext c) => Context c o where
   (//) :: (Show s1, Show s2) => o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
   (\\) :: (Show s1, Show s2) => o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
 
--- (\\) is derivable from (//) using
--- l \\ c = l // (cmap (lift swap swap) (lift swap swap) c)
--- (and vice versa) but it doesn't typecheck and I don't understand why
-
--- ContextAdd is a separate class to Precontext and Context because its implementation is more ad-hoc,
--- eg. it can't be done generically in a monad
-
 $(singletons [d|
   class ContextAdd c where
     prl :: c (Choice s1 s2) t (Choice a1 a2) b -> Option (c s1 t a1 b)
     prr :: c (Choice s1 s2) t (Choice a1 a2) b -> Option (c s2 t a2 b)
-    match :: c (Choice s1 s2) t (Choice a1 a2) b -> Choice (c s1 t a1 b) (c s2 t a2 b)
-    both :: c (x, x') (s, s') (y, y') (r, r') -> (c x s y r, c x' s' y' r')|])
+    match :: c (Choice s1 s2) t (Choice a1 a2) b -> Choice (c s1 t a1 b) (c s2 t a2 b)|])
+
 $(promote [d|
   choiceTy :: forall c x1 s y1 r x2 y2.
               ContextAdd c => (c x1 s y1 r -> [Type])
                            -> (c x2 s y2 r -> [Type])
-                           -> c (Choice x1 x2) s (Choice y1 y2) r -> [Type] 
+                           -> c (Choice x1 x2) s (Choice y1 y2) r -> [Type]
   choiceTy f g ctx = pick f g (match ctx)|])
 
 {-
