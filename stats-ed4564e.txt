@@ -1,0 +1,209 @@
+ testEq 2
+----Analytics begin----Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 43, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 13459, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 13459, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 13459, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 13459, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 13459, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 13459, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 13459, noteCalls = 96}
+
+ Strategies are in equilibrium
+ NEWGAME:
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 60, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 12579, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 12579, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 12579, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 12579, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 12579, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 12579, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 12579, noteCalls = 96}
+
+ Strategies are in equilibrium
+ NEWGAME:
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 77, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 11696, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 11696, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 11696, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 11696, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 11696, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 11696, noteCalls = 96}
+Observing ...done:
+Stats {uniformCalls = 48, bindCalls = 11696, noteCalls = 96}
+
+ Strategies are in equilibrium
+ NEWGAME:
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 124, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4839, noteCalls = 48}
+
+ Strategies are in equilibrium
+ NEWGAME:
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 174, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4056, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4056, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4056, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4056, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4056, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 4056, noteCalls = 48}
+
+ Strategies are in equilibrium
+ NEWGAME:
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 208, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3633, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3633, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3633, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3633, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3633, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3633, noteCalls = 48}
+
+ Strategies are in equilibrium
+ NEWGAME:
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 243, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3208, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3208, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3208, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3208, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3208, noteCalls = 48}
+Observing ...done:
+Stats {uniformCalls = 24, bindCalls = 3208, noteCalls = 48}
+
+ Strategies are in equilibrium
+ NEWGAME:
+----Analytics end----
+
+
+---------------------------------------------------------------------------------------
+
+ testEq 3
+----Analytics begin----Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 43, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 572171, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 572171, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 572171, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 572171, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 572171, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 572171, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 572171, noteCalls = 4144}
+
+ Strategies are in equilibrium
+ NEWGAME:
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 60, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 0, bindCalls = 1, noteCalls = 0}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 533451, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 533451, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 533451, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 533451, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 533451, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 533451, noteCalls = 4144}
+Observing ...done:
+Stats {uniformCalls = 2160, bindCalls = 533451, noteCalls = 4144}

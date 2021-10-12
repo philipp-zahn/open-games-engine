@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -21,8 +23,12 @@ module Numeric.Probability.Distribution.Observable
 
 import           Control.Monad
 import           Control.Monad.Reader
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
+import           Data.IORef
 import qualified Data.List as List
+import           Data.String
 import           GHC.Stack
 import qualified Numeric.Probability.Distribution as I
 import           System.IO.Unsafe
@@ -95,52 +101,66 @@ toT =
 --------------------------------------------------------------------------------
 -- Reflection with printing
 
+data Stats = Stats
+  { uniformCalls :: !Int
+  , bindCalls :: !Int
+  , noteCalls :: !Int
+  } deriving (Show)
+
 observeT :: (Num p, Fractional p) => T p a -> IO [(a,p)]
-observeT = flip runReaderT 0 . go
-  where
-    go :: (Num p, Fractional p) => T p a -> ReaderT Int IO [(a, p)]
-    go =
-      \case
-        Bind m f -> do
-          {-output "Bind-LHS"-}
-          xps <- local (+ 2) (go m)
-          if null xps
-            then do
-              {-output "LHS was null"-}
-              pure []
-            else do
-              {-output "Bind-RHS"-}
-              yqps <-
-                local
-                  (+ 2)
-                  (traverse
-                     (\(_i, (x, p)) -> do
-                        {-output ("RHS[" <> S8.pack (show i) <> "]")-}
-                        yqs <- local (+ 2) (go (f x))
-                        pure (map (\(y, q) -> (y, q * p)) yqs))
-                     (zip [1 :: Int ..] xps))
-              pure (concat yqps)
-        Uniform _c as -> do
-          output "Uniform"
-          pure (I.decons (I.uniform as))
-        FromFreqs _c as -> do
-          output "FromFreqs"
-          pure (I.decons (I.fromFreqs as))
-        Certainly _c as -> do
-          {-output "Certainly"-}
-          pure (I.decons (I.certainly as))
-        MapMaybe _c f as -> do
-          {-output "MapMaybe"-}
-          as' <- go as
-          pure (I.decons (I.mapMaybe f (I.fromFreqs as')))
-        Note _c no -> do
-          output ("Note: " <> S8.pack no)
-          pure [((),1)]
-    _smallCs c =
-      case getCallStack c of
-        [] -> "(no call stack)"
-        ((_, srcloc):_) -> prettySrcLoc srcloc
-    output s = do
-      i <- ask
-      lift (S8.putStrLn (S8.replicate i ' ' <> s))
-      pure ()
+observeT m = do
+  S8.putStr "Observing ..."
+  stats <- newIORef (Stats 0 0 0)
+  dots <- newIORef 0
+  let go :: (Num p, Fractional p) => T p a -> ReaderT Int IO [(a, p)]
+      go =
+        \case
+          Bind m f -> do
+            liftIO
+              (modifyIORef'
+                 stats
+                 (\Stats {..} -> Stats {bindCalls = bindCalls + 1, ..}))
+            xps <- local (+ 2) (go m)
+            if null xps
+              then do
+                pure []
+              else do
+                yqps <-
+                  local
+                    (+ 2)
+                    (traverse
+                       (\(_i, (x, p))
+
+                         -> do
+                          yqs <- local (+ 2) (go (f x))
+                          pure (map (\(y, q) -> (y, q * p)) yqs))
+                       (zip [1 :: Int ..] xps))
+                pure (concat yqps)
+          Uniform _c as -> do
+            liftIO
+              (modifyIORef'
+                 stats
+                 (\Stats {..} -> Stats {uniformCalls = uniformCalls + 1, ..}))
+            pure (I.decons (I.uniform as))
+          FromFreqs _c as -> do
+            pure (I.decons (I.fromFreqs as))
+          Certainly _c as -> do
+            pure (I.decons (I.certainly as))
+          MapMaybe _c f as -> do
+            as' <- go as
+            pure (I.decons (I.mapMaybe f (I.fromFreqs as')))
+          Note _c no -> do
+            liftIO
+              (modifyIORef'
+                 stats
+                 (\Stats {..} -> Stats {noteCalls = noteCalls + 1, ..}))
+            pure [((), 1)]
+      _smallCs c =
+        case getCallStack c of
+          [] -> "(no call stack)"
+          ((_, srcloc):_) -> prettySrcLoc srcloc
+  x <- flip runReaderT 0 (go m)
+  S8.putStrLn "done:"
+  stats' <- readIORef stats
+  print stats'
+  pure x
