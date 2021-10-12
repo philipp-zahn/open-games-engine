@@ -94,7 +94,7 @@ dependentEpsilonDecision epsilon name ys = OpenGame {
                             in StochasticStatefulOptic v u,
   evaluate = \(a ::- Nil) (StochasticStatefulContext h k) ->
      (concat [ let u y = expected (evalStateT (do {t <- lift (bayes h x);
-                                                   r <- k t y; 
+                                                   r <- k t y;
                                                    gets ((+ r) . HM.findWithDefault 0.0 name)})
                                     HM.empty)
                    strategy = runKleisli a x
@@ -104,13 +104,13 @@ dependentEpsilonDecision epsilon name ys = OpenGame {
 
 
 -- Support functionality for constructing open games
-fromLens :: (x -> y) -> (x -> r -> s) -> StochasticStatefulBayesianOpenGame '[] '[] x s y r
+fromLens :: Ord x=> (x -> y) -> (x -> r -> s) -> StochasticStatefulBayesianOpenGame '[] '[] x s y r
 fromLens v u = OpenGame {
   play = \Nil -> StochasticStatefulOptic (\x -> return (x, v x)) (\x r -> return (u x r)),
   evaluate = \Nil _ -> Nil}
 
 
-fromFunctions :: (x -> y) -> (r -> s) -> StochasticStatefulBayesianOpenGame '[] '[] x s y r
+fromFunctions :: Ord x => (x -> y) -> (r -> s) -> StochasticStatefulBayesianOpenGame '[] '[] x s y r
 fromFunctions f g = fromLens f (const g)
 
 nature :: Stochastic x -> StochasticStatefulBayesianOpenGame '[] '[] () () x ()
@@ -134,8 +134,8 @@ distFromList = fromFreqs
 -- pure action (no randomization)
 pureAction x = Kleisli $ const $ certainly x
 
-playDeterministically :: a -> Stochastic a
-playDeterministically = certainly
+playDeterministically :: Ord a => a -> Stochastic a
+playDeterministically = norm .  certainly
 
 
 -- discount Operation for repeated structures

@@ -24,12 +24,12 @@ import           Data.HashMap                       as HM hiding (null,map,mapMa
 import           Numeric.Probability.Distribution.Observable   hiding (lift)
 
 class Optic o where
-  lens :: (s -> a) -> (s -> b -> t) -> o s t a b
+  lens :: Ord s => (s -> a) -> (s -> b -> t) -> o s t a b
   (>>>>) :: o s t a b -> o a b p q -> o s t p q
   (&&&&) :: o s1 t1 a1 b1 -> o s2 t2 a2 b2 -> o (s1, s2) (t1, t2) (a1, a2) (b1, b2)
   (++++) :: o s1 t a1 b -> o s2 t a2 b -> o (Either s1 s2) t (Either a1 a2) b
 
-identity :: (Optic o) => o s t s t
+identity :: (Optic o, Ord s) => o s t s t
 identity = lens id (flip const)
 
 class Precontext c where
@@ -54,13 +54,14 @@ class ContextAdd c where
   prr :: c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s2 t a2 b)
 
 -------------------------------------------------------------
---- replicate the old implementation of a stochastic context 
+--- replicate the old implementation of a stochastic context
 type Stochastic = T Double
 type Vector = HM.Map String Double
 
 
 data StochasticStatefulOptic s t a b where
-  StochasticStatefulOptic :: (s -> Stochastic (z, a))
+  StochasticStatefulOptic :: Ord z =>
+                             (s -> Stochastic (z, a))
                           -> (z -> b -> StateT Vector Stochastic t)
                           -> StochasticStatefulOptic s t a b
 
@@ -158,4 +159,3 @@ instance ContextAdd StochasticContext where
     = let fs = [((z, s2), p) | ((z, Right s2), p) <- decons h]
        in if null fs then Nothing
                      else Just (StochasticContext (fromFreqs fs) (\z a2 -> k z (Right a2)))
-

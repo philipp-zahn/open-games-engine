@@ -81,8 +81,8 @@ payoffAndGate penalty reward deposits False
 
 
 andGateTestPrior = do
-  deposits <- uniformDist [replicate 3 x | x <- [0.0, 1.0 .. 10.0]]
-  andResults <- uniformDist [True, False]
+  deposits <- norm $ uniformDist [replicate 3 x | x <- [0.0, 1.0 .. 10.0]]
+  andResults <- norm $ uniformDist [True, False]
   return (deposits, andResults)
 --------
 -- Games
@@ -270,9 +270,9 @@ andGateGame (AndGateMarkovParams  reward costOfCapital minBribe maxBribe increme
 -- continuation
 
 -- extract continuation
-extractContinuation :: StochasticStatefulOptic s () s () -> s -> StateT Vector Stochastic ()
+extractContinuation :: Ord s => StochasticStatefulOptic s () s () -> s -> StateT Vector Stochastic ()
 extractContinuation (StochasticStatefulOptic v u) x = do
-  (z,a) <- ST.lift (v x)
+  (z,a) <- ST.lift (norm (v x))
   u z ()
 
 -- extract next state (action)
@@ -302,7 +302,7 @@ determineContinuationPayoffs parameters iterator strat action = do
       ST.lift $ note ("go[" ++ show iterator ++ "]")
       extractContinuation executeStrat action
       ST.lift $ note "andGateTestPrior"
-      nextInput <- ST.lift $ andGateTestPrior
+      nextInput <- ST.lift $ norm $ andGateTestPrior
       go parameters (pred iterator) strat nextInput
       where
         executeStrat = play (andGateGame parameters) strat

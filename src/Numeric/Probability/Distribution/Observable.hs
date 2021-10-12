@@ -19,6 +19,7 @@ module Numeric.Probability.Distribution.Observable
   , observeT
   , toT
   , note
+  , norm
   ) where
 
 import           Control.Monad
@@ -40,6 +41,7 @@ data T p a where
   Uniform :: Fractional prob => CallStack -> [a] -> T prob a
   Bind :: T p x -> (x -> T p b) -> T p b
   Note :: CallStack -> String -> T p ()
+  Norm :: Ord x => T p x -> T p x
 
 instance (Num prob, Ord prob, Show prob, Ord a, Show a) => Show (T prob a) where
   show _ = "T"
@@ -74,6 +76,9 @@ uniform = Uniform callStack
 note :: HasCallStack => String -> T prob ()
 note = Note callStack
 
+norm :: Ord x => T p x -> T p x
+norm = Norm
+
 --------------------------------------------------------------------------------
 -- Exports; this is where the monad is "run" and where we can
 -- reasonably print a trace.
@@ -88,7 +93,7 @@ expected = sum . List.map (\(x,p) -> x * p) . decons
 --------------------------------------------------------------------------------
 -- Reflection
 
-toT :: Num p => T p a -> I.T p a
+toT :: (Num p) => T p a -> I.T p a
 toT =
   \case
     Uniform _ as -> I.uniform as
@@ -97,6 +102,7 @@ toT =
     MapMaybe _ f x -> I.mapMaybe f (toT x)
     Bind m f -> toT m >>= toT . f
     Note _ _ -> pure ()
+    Norm m -> I.norm (toT m)
 
 --------------------------------------------------------------------------------
 -- Reflection with printing
@@ -115,6 +121,10 @@ observeT m = do
   let go :: (Num p, Fractional p) => T p a -> ReaderT Int IO [(a, p)]
       go =
         \case
+          Norm m -> do
+            xs <- go m
+            let !xs' = I.norm' xs
+            pure xs'
           Bind m f -> do
             liftIO
               (modifyIORef'
@@ -129,9 +139,7 @@ observeT m = do
                   local
                     (+ 2)
                     (traverse
-                       (\(_i, (x, p))
-
-                         -> do
+                       (\(_i, (x, p)) -> do
                           yqs <- local (+ 2) (go (f x))
                           pure (map (\(y, q) -> (y, q * p)) yqs))
                        (zip [1 :: Int ..] xps))

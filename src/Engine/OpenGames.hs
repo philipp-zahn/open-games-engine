@@ -32,7 +32,7 @@ reindex v u g = OpenGame {
   evaluate = \a c -> u a (evaluate g (v a) c)
 }
 
-(>>>) :: (Optic o, Context c o, Unappend a, Unappend b)
+(>>>) :: (Ord z, Ord x) => (Optic o, Context c o, Unappend a, Unappend b)
       => OpenGame o c a b x s y r -> OpenGame o c a' b' y r z q
       -> OpenGame o c (a +:+ a') (b +:+ b') x s z q
 (>>>) g h = OpenGame {

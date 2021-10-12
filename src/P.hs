@@ -43,7 +43,9 @@ draw =
 -- Finally, you need a `decons', such as,
 decons :: ProbT m e () -> m [(e,Double)]
 decons = undefined
--- ... and perhaps an internal CTable would do the trick for this.
+-- ... and perhaps an internal CTable would do the trick for this. But
+-- what is the project doing with the resulting list? Good question to
+-- ask.
 --
 -- data CTable a = CTable
 --   { ctable :: !(CondensedTableV a)
