@@ -34,7 +34,7 @@ import           Data.HashMap                       as HM hiding (null,map,mapMa
 import Data.List (maximumBy)
 import Data.Ord (comparing)
 import           Data.Utils
-import Numeric.Probability.Distribution hiding (map, lift, filter)
+import Numeric.Probability.Distribution.Observable hiding (map, lift, filter)
 
 import Engine.OpenGames hiding (lift)
 import Engine.OpticClass
@@ -48,14 +48,14 @@ type StochasticBayesianOpenGame a b x s y r = OpenGame StochasticOptic Stochasti
 
 type Agent = String
 
-support :: Stochastic x -> [x]
+support :: Constraint0 x => Stochastic x -> [x]
 support = map fst . decons
 
-bayes :: (Eq y) => Stochastic (x, y) -> y -> Stochastic x
+bayes :: (Eq y, Ord x, Ord y) => Stochastic (x, y) -> y -> Stochastic x
 bayes a y = mapMaybe (\(x, y') -> if y' == y then Just x else Nothing) a
 
 
-deviationsInContext :: (Show x, Show y, Ord y, Show theta)
+deviationsInContext :: (Ord y, Show theta)
                     => Double -> Agent -> x -> theta -> Stochastic y -> (y -> Double) -> [y] -> [DiagnosticInfoBayesian x y]
 deviationsInContext epsilon name x theta strategy u ys
   = [DiagnosticInfoBayesian { equilibrium = strategicPayoff >= optimalPayoff - epsilon,
@@ -71,7 +71,7 @@ deviationsInContext epsilon name x theta strategy u ys
         (optimalPlay, optimalPayoff) = maximumBy (comparing snd) [(y, u y) | y <- ys]
 
 
-dependentDecision :: (Eq x, Show x, Ord y, Show y) => String -> (x -> [y]) -> StochasticBayesianOpenGame '[Kleisli Stochastic x y] '[[DiagnosticInfoBayesian x y]] x () y Double
+dependentDecision :: (Eq x, Show x, Ord x, Ord y, Show y) => String -> (x -> [y]) -> StochasticBayesianOpenGame '[Kleisli Stochastic x y] '[[DiagnosticInfoBayesian x y]] x () y Double
 dependentDecision name ys = OpenGame {
   play = \(a ::- Nil) -> let v x = do {y <- runKleisli a x; return ((), y)}
                              u () _ = return ()
@@ -83,7 +83,7 @@ dependentDecision name ys = OpenGame {
                   in deviationsInContext 0 name x theta strategy u (ys x)
               | (theta, x) <- support h]) ::- Nil }
 
-dependentEpsilonDecision :: (Eq x, Show x, Ord y, Show y) => Double -> String -> (x -> [y])  -> StochasticBayesianOpenGame '[Kleisli Stochastic x y] '[[DiagnosticInfoBayesian x y]] x () y Double
+dependentEpsilonDecision :: (Ord x, Eq x, Show x, Ord y, Show y) => Double -> String -> (x -> [y])  -> StochasticBayesianOpenGame '[Kleisli Stochastic x y] '[[DiagnosticInfoBayesian x y]] x () y Double
 dependentEpsilonDecision epsilon name ys = OpenGame {
   play = \(a ::- Nil) -> let v x = do {y <- runKleisli a x; return ((), y)}
                              u () _ = return ()
@@ -98,13 +98,13 @@ dependentEpsilonDecision epsilon name ys = OpenGame {
 
 
 -- Support functionality for constructing open games
-fromLens :: (x -> y) -> (x -> r -> s) -> StochasticBayesianOpenGame '[] '[] x s y r
+fromLens :: (Ord x, Ord s) => (x -> y) -> (x -> r -> s) -> StochasticBayesianOpenGame '[] '[] x s y r
 fromLens v u = OpenGame {
   play = \Nil -> StochasticOptic (\x -> return (x, v x)) (\x r -> return (u x r)),
   evaluate = \Nil _ -> Nil}
 
 
-fromFunctions :: (x -> y) -> (r -> s) -> StochasticBayesianOpenGame '[] '[] x s y r
+fromFunctions :: (Ord x, Ord s) => (x -> y) -> (r -> s) -> StochasticBayesianOpenGame '[] '[] x s y r
 fromFunctions f g = fromLens f (const g)
 
 nature :: Stochastic x -> StochasticBayesianOpenGame '[] '[] () () x ()
@@ -112,7 +112,7 @@ nature a = OpenGame {
   play = \Nil -> StochasticOptic (\() -> do {x <- a; return ((), x)}) (\() () -> return ()),
   evaluate = \Nil _ -> Nil}
 
-liftStochastic :: (x -> Stochastic y) -> StochasticBayesianOpenGame '[] '[] x () y ()
+liftStochastic :: (Ord x) => (x -> Stochastic y) -> StochasticBayesianOpenGame '[] '[] x () y ()
 liftStochastic f = OpenGame {
   play = \Nil -> StochasticOptic (\x -> do {y <- f x; return ((), y)}) (\() () -> return ()),
   evaluate = \_ _ -> Nil}
@@ -120,15 +120,15 @@ liftStochastic f = OpenGame {
 -- Support functionality for stochastic processes (also interface to the probability module in use)
 
 -- uniform distribution
+uniformDist :: (Constraint0 a, Fractional prob) => [a] -> T prob a
 uniformDist = uniform
 
 -- tailored distribution from a list
+distFromList :: (Constraint0 a, Fractional p, Constraint0 p) => [(a,p)] -> T p a
 distFromList = fromFreqs
 
 -- pure action (no randomization)
 pureAction x = Kleisli $ const $ certainly x
 
-playDeterministically :: a -> Stochastic a
+playDeterministically :: Constraint0 a => a -> Stochastic a
 playDeterministically = certainly
-
-

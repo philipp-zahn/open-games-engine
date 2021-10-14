@@ -7,7 +7,6 @@
 
 module Examples.Staking.AndGateMarkov where
 
-import           Debug.Trace
 import           Engine.Engine
 import           Preprocessor.Preprocessor
 
@@ -277,7 +276,7 @@ andGateGame (AndGateMarkovParams  reward costOfCapital minBribe maxBribe increme
 extractContinuation :: StochasticStatefulOptic s () s () -> s -> StateT Vector Stochastic ()
 extractContinuation (StochasticStatefulOptic v u) x = do
   (z,a) <- ST.lift (v x)
-  trace ",,2" (pure ())
+
   u z ()
 
 -- extract next state (action)
@@ -300,7 +299,7 @@ extractNextState2 (StochasticStatefulOptic v _) x = do
 -- Random prior indpendent of previous moves
 determineContinuationPayoffs parameters 1        strat action = pure ()
 determineContinuationPayoffs parameters iterator strat action = do
-   trace ",,1" (pure ())
+
    extractContinuation executeStrat action
    nextInput <- ST.lift $ andGateTestPrior
    determineContinuationPayoffs parameters (pred iterator) strat nextInput
@@ -309,7 +308,7 @@ determineContinuationPayoffs parameters iterator strat action = do
 -- Actual moves affect next moves
 determineContinuationPayoffs' parameters 1        strat action = pure ()
 determineContinuationPayoffs' parameters iterator strat action = do
-   trace ",,1" (pure ())
+
    extractContinuation executeStrat action
    nextInput <- ST.lift $ extractNextState executeStrat action
    determineContinuationPayoffs' parameters (pred iterator) strat nextInput
@@ -323,11 +322,11 @@ determineContinuationPayoffs2 iterator initialAction = do
 
 determineContinuationPayoffs3 1        _             = pure ()
 determineContinuationPayoffs3 iterator initialAction = do
-  trace ",,1" (pure ())
+
   -- extractContinuation executeStrat initialAction
   -- 2nextInput <- ST.lift $ extractNextState executeStrat $ initialAction
   -- determineContinuationPayoffs3 (pred iterator) initialAction
-  --pure ()
+  pure ()
 -- where executeStrat =  play (andGateGame andGateMarkovTestParams) strategyTuple
 
 -- fix context used for the evaluation
@@ -337,7 +336,7 @@ contextCont' parameters iterator strat initialAction = StochasticStatefulContext
 
 contextCont2 iterator initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> determineContinuationPayoffs2 iterator action)
 
-contextCont3 iterator initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> trace ",,1" (pure ())) -- determineContinuationPayoffs3 iterator action)
+contextCont3 iterator initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> (pure ())) -- determineContinuationPayoffs3 iterator action)
 
 
 

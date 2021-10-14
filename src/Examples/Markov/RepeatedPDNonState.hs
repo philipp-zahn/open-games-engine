@@ -24,7 +24,7 @@ import           Engine.BayesianGamesNonState
 import           Preprocessor.Preprocessor
 
 
-import Numeric.Probability.Distribution hiding (map, lift, filter)
+import Numeric.Probability.Distribution.Observable hiding (map, lift, filter)
 
 -- 1.0. Prisoner's dilemma
 data ActionPD = Cooperate | Defect
