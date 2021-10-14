@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE ExtendedDefaultRules #-}
 
 module Engine.AtomicGames
  ( decision
@@ -141,4 +142,3 @@ generateGame "pureDecision2" ["actionSpace","payoffFunction","playerName"] $
   (Block ["observation"] []
          [Line [[|observation|]] [] [|dependentDecision playerName (\y -> actionSpace)|] ["action"] [[|payoffFunction observation action returns|]]]
          [[|action|]] ["returns"])
-

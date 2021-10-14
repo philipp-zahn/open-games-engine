@@ -32,17 +32,19 @@ library:
     - Examples.Bayesian
     - Examples.Decision
     - Examples.SequentialMoves
-    - Examples.Auctions.AuctionSupportFunctions
-    - Examples.Auctions.ChooseReservePrice
-    - Examples.Auctions.DutchAuction
-    - Examples.Auctions.SequentialAuction
-    - Examples.Auctions.SimultaneousBidAuction
+    # - Examples.Auctions.AuctionSupportFunctions
+    # - Examples.Auctions.ChooseReservePrice
+    # - Examples.Auctions.DutchAuction
+    # - Examples.Auctions.SequentialAuction
+    # - Examples.Auctions.SimultaneousBidAuction
     - Examples.Markov.RepeatedPD
     - Examples.Markov.RepeatedPDNonState
     - Examples.Markov.TwoStageMarkov
+    - Examples.Staking.AndGateMarkov
 
 dependencies:
     - base >=4.7 && <5
+    - free
     - mtl
     - transformers
     - probability
@@ -56,7 +58,12 @@ dependencies:
     - haskeline
     - hashmap
     - hashable
-    - extra 
+    - extra
+    - bytestring
+    - mwc-random
+    - vector
+    - random
+    - constrained-normal
 
 executables:
   open-games-exe:
@@ -81,4 +88,3 @@ benchmarks:
     dependencies:
       - open-games-hs
       - criterion
-

@@ -21,15 +21,15 @@ module Engine.OpticClass
 
 import           Control.Monad.State                hiding (state)
 import           Data.HashMap                       as HM hiding (null,map,mapMaybe)
-import           Numeric.Probability.Distribution   hiding (lift)
+import           Numeric.Probability.Distribution.Observable   hiding (lift)
 
 class Optic o where
-  lens :: (s -> a) -> (s -> b -> t) -> o s t a b
+  lens :: (Ord s, Ord t) => (s -> a) -> (s -> b -> t) -> o s t a b
   (>>>>) :: o s t a b -> o a b p q -> o s t p q
   (&&&&) :: o s1 t1 a1 b1 -> o s2 t2 a2 b2 -> o (s1, s2) (t1, t2) (a1, a2) (b1, b2)
   (++++) :: o s1 t a1 b -> o s2 t a2 b -> o (Either s1 s2) t (Either a1 a2) b
 
-identity :: (Optic o) => o s t s t
+identity :: (Optic o, Ord s, Ord t) => o s t s t
 identity = lens id (flip const)
 
 class Precontext c where
@@ -38,9 +38,9 @@ class Precontext c where
 -- Precontext is a separate class to Context because otherwise the typechecker throws a wobbly
 
 class (Optic o, Precontext c) => Context c o where
-  cmap :: o s1 t1 s2 t2 -> o a1 b1 a2 b2 -> c s1 t1 a2 b2 -> c s2 t2 a1 b1
-  (//) :: (Show s1) => o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
-  (\\) :: (Show s2) => o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
+  cmap :: (Show s1, Ord s1, Ord s2, Ord t1, Ord t2) => o s1 t1 s2 t2 -> o a1 b1 a2 b2 -> c s1 t1 a2 b2 -> c s2 t2 a1 b1
+  (//) :: (Show s1, Ord s1, Ord s2 , Ord t1, Ord t2) => o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
+  (\\) :: (Show s2, Ord s2, Ord s1 , Ord t1, Ord t2) => o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
 
 -- (\\) is derivable from (//) using
 -- l \\ c = l // (cmap (lift swap swap) (lift swap swap) c)
@@ -50,17 +50,18 @@ class (Optic o, Precontext c) => Context c o where
 -- eg. it can't be done generically in a monad
 
 class ContextAdd c where
-  prl :: c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s1 t a1 b)
-  prr :: c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s2 t a2 b)
+  prl :: (Ord t, Ord s1, Ord s2) => c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s1 t a1 b)
+  prr :: (Ord t, Ord s1, Ord s2) =>  c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s2 t a2 b)
 
 -------------------------------------------------------------
---- replicate the old implementation of a stochastic context 
+--- replicate the old implementation of a stochastic context
 type Stochastic = T Double
 type Vector = HM.Map String Double
 
 
 data StochasticStatefulOptic s t a b where
-  StochasticStatefulOptic :: (s -> Stochastic (z, a))
+  StochasticStatefulOptic :: (Ord z, Ord s, Ord t) =>
+                             (s -> Stochastic (z, a))
                           -> (z -> b -> StateT Vector Stochastic t)
                           -> StochasticStatefulOptic s t a b
 
@@ -79,7 +80,7 @@ instance Optic StochasticStatefulOptic where
           u (Right z2) b = u2 z2 b
 
 data StochasticStatefulContext s t a b where
-  StochasticStatefulContext :: (Show z) => Stochastic (z, s) -> (z -> a -> StateT Vector Stochastic b) -> StochasticStatefulContext s t a b
+  StochasticStatefulContext :: (Ord z, Ord s, Show z, Ord t) => Stochastic (z, s) -> (z -> a -> StateT Vector Stochastic b) -> StochasticStatefulContext s t a b
 
 instance Precontext StochasticStatefulContext where
   void = StochasticStatefulContext (return ((), ())) (\() () -> return ())
@@ -111,7 +112,7 @@ instance ContextAdd StochasticStatefulContext where
 
 -- Experimental non state
 data StochasticOptic s t a b where
-  StochasticOptic :: (s -> Stochastic (z, a))
+  StochasticOptic :: (Ord t, Ord s, Ord z) => (s -> Stochastic (z, a))
                           -> (z -> b -> Stochastic t)
                           -> StochasticOptic s t a b
 
@@ -130,7 +131,7 @@ instance Optic StochasticOptic where
           u (Right z2) b = u2 z2 b
 
 data StochasticContext s t a b where
-  StochasticContext :: (Show z) => Stochastic (z, s) -> (z -> a -> Stochastic b) -> StochasticContext s t a b
+  StochasticContext :: (Show z, Ord z, Ord s, Ord t) => Stochastic (z, s) -> (z -> a -> Stochastic b) -> StochasticContext s t a b
 
 instance Precontext StochasticContext where
   void = StochasticContext (return ((), ())) (\() () -> return ())
@@ -158,4 +159,3 @@ instance ContextAdd StochasticContext where
     = let fs = [((z, s2), p) | ((z, Right s2), p) <- decons h]
        in if null fs then Nothing
                      else Just (StochasticContext (fromFreqs fs) (\z a2 -> k z (Right a2)))
-

@@ -1,0 +1,156 @@
+TwoStageMarkovTest with 2 iterations
+
+Note: determineContinuationPayoffs
+                                                                                                          Note: go[2]
+                                                                                                                  Note: nextState
+                                                                                                                        Note: go[1]
+                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[2]
+                                                                                                                  Note: nextState
+                                                                                                                        Note: go[1]
+                                                                                                              Uniform
+                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[2]
+                                                                                                                  Note: nextState
+                                                                                                                        Note: go[1]
+                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[2]
+                                                                                                                                                                        Uniform
+                                                                                                                  Note: nextState
+                                                                                                                                                                                Uniform
+                                                                                                                        Note: go[1]
+                                                                                                                        Note: go[1]
+                                                                                                                  Note: nextState
+                                                                                                                                                                                Uniform
+                                                                                                                        Note: go[1]
+                                                                                                                        Note: go[1]
+------------------------------------
+TwoStageMarkovTest with 3 iterations
+
+----Analytics begin----                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[3]
+                                                                                                                  Note: nextState
+                                                                                                                          Note: go[2]
+                                                                                                                                  Note: nextState
+                                                                                                                                        Note: go[1]
+                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[3]
+                                                                                                                  Note: nextState
+                                                                                                                          Note: go[2]
+                                                                                                                                  Note: nextState
+                                                                                                                                        Note: go[1]
+                                                                                                              Uniform
+                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[3]
+                                                                                                                  Note: nextState
+                                                                                                                          Note: go[2]
+                                                                                                                                  Note: nextState
+                                                                                                                                        Note: go[1]
+                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[3]
+                                                                                                                                                                        Uniform
+                                                                                                                  Note: nextState
+                                                                                                                                                                                Uniform
+                                                                                                                          Note: go[2]
+                                                                                                                                  Note: nextState
+                                                                                                                                        Note: go[1]
+                                                                                                                          Note: go[2]
+                                                                                                                                                                                        Uniform
+                                                                                                                                  Note: nextState
+                                                                                                                                                                                                Uniform
+                                                                                                                                        Note: go[1]
+                                                                                                                                        Note: go[1]
+                                                                                                                                  Note: nextState
+                                                                                                                                                                                                Uniform
+                                                                                                                                        Note: go[1]
+                                                                                                                                        Note: go[1]
+                                                                                                                  Note: nextState
+                                                                                                                                                                                Uniform
+                                                                                                                          Note: go[2]
+                                                                                                                                  Note: nextState
+                                                                                                                                        Note: go[1]
+                                                                                                                          Note: go[2]
+                                                                                                                                                                                        Uniform
+                                                                                                                                  Note: nextState
+                                                                                                                                                                                                Uniform
+                                                                                                                                        Note: go[1]
+                                                                                                                                        Note: go[1]
+                                                                                                                                  Note: nextState
+                                                                                                                                                                                                Uniform
+                                                                                                                                        Note: go[1]
+                                                                                                                                        Note: go[1]
+
+---------------------------
+TwoStageMarkovTest -- with deterministic transition and 2 iterations
+----Analytics begin----                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[2]
+                                                                                                                  Note: nextState
+                                                                                                                        Note: go[1]
+                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[2]
+                                                                                                                  Note: nextState
+                                                                                                                        Note: go[1]
+                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[2]
+                                                                                                                  Note: nextState
+                                                                                                                        Note: go[1
+
+
+---------------------------
+TwoStageMarkovTest -- with deterministic transition and 3 iterations
+----Analytics begin----                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[3]
+                                                                                                                  Note: nextState
+                                                                                                                          Note: go[2]
+                                                                                                                                  Note: nextState
+                                                                                                                                        Note: go[1]
+                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[3]
+                                                                                                                  Note: nextState
+                                                                                                                          Note: go[2]
+                                                                                                                                  Note: nextState
+                                                                                                                                        Note: go[1]
+                                                                                                      Note: determineContinuationPayoffs
+                                                                                                          Note: go[3]
+                                                                                                                  Note: nextState
+                                                                                                                          Note: go[2]
+                                                                                                                                  Note: nextState
+                                                                                                                                        Note: go[1]
+
+
+----------------------------
+RepeatedPD with 2 iterations
+
+Note: determineContinuationPayoffs
+                                                                Note: go[2]
+                                                                        Note: nextState
+                                                                              Note: go[1]
+                                                            Note: determineContinuationPayoffs
+                                                                Note: go[2]
+                                                                        Note: nextState
+                                                                              Note: go[1]
+                                                            Note: determineContinuationPayoffs
+                                                                Note: go[2]
+                                                                        Note: nextState
+                                                                              Note: go[1
+----------------------------
+RepeatedPD with 3 iterations
+
+----Analytics begin----                                                            Note: determineContinuationPayoffs
+                                                                Note: go[3]
+                                                                        Note: nextState
+                                                                                Note: go[2]
+                                                                                        Note: nextState
+                                                                                              Note: go[1]
+                                                            Note: determineContinuationPayoffs
+                                                                Note: go[3]
+                                                                        Note: nextState
+                                                                                Note: go[2]
+                                                                                        Note: nextState
+                                                                                              Note: go[1]
+                                                            Note: determineContinuationPayoffs
+                                                                Note: go[3]
+                                                                        Note: nextState
+                                                                                Note: go[2]
+                                                                                        Note: nextState
+                                                                                              Note: go[1]

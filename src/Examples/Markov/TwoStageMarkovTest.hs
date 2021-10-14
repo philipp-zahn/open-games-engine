@@ -4,7 +4,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Examples.Markov.TwoStageMarkov where 
+module Examples.Markov.TwoStageMarkovTest where
 
 import           Data.Tuple.Extra (uncurry3)
 import           Engine.Engine
@@ -62,7 +62,7 @@ transitionEndState :: EndState -> ActionPD -> ActionPD -> Stochastic EndState
 transitionEndState True _ _ = playDeterministically True
 transitionEndState False Defect _ = uniform [True,False]
 transitionEndState False _      Defect = uniform [True,False]
-transitionEndState False Cooperate Cooperate = playDeterministically False 
+transitionEndState False Cooperate Cooperate = playDeterministically False
 
 -- The transition happens deterministically if one of the player does not play _Cooperate_ and then we stay there
 transitionEndStateDeterm :: EndState -> ActionPD -> ActionPD -> Stochastic EndState
@@ -152,7 +152,7 @@ startGame = [opengame|
    returns   :      ;
   |]
 
-  
+
 -- absorbing state
 -- only one action and therefore deterministic payoffGame
 endState = [opengame|
@@ -213,7 +213,7 @@ endStateGame = [opengame|
 
 -- define the whole game, here with pathological endgame
 -- payoffs only depend on state
-completeGame2 = [opengame|
+completeGame = [opengame|
 
    inputs    : (dec1Old,dec2Old,gameStateOld) ;
    feedback  :  ;
@@ -250,8 +250,9 @@ completeGame2 = [opengame|
    returns   :         ;
   |]
 
- -- define the whole game, here with pathological endgame
-completeGame = [opengame|
+-- define the whole game, here with pathological endgame
+-- payoffs only depend on state
+completeGameDeterm = [opengame|
 
    inputs    : (dec1Old,dec2Old,gameStateOld) ;
    feedback  :  ;
@@ -259,7 +260,7 @@ completeGame = [opengame|
    :----------------------------:
    inputs    : (dec1Old,dec2Old,gameStateOld);
    feedback  :      ;
-   operation : prisonersDilemma ;
+   operation : startGame ;
    outputs   : (dec1New,dec2New) ;
    returns   : ;
 
@@ -271,7 +272,7 @@ completeGame = [opengame|
 
    inputs    :  (gameStateOld,dec1New,dec2New) ;
    feedback  :      ;
-   operation : liftStochasticForward $ uncurry3 transitionEndState;
+   operation : liftStochasticForward $ uncurry3 transitionEndStateDeterm;
    outputs   : gameStateNew;
    returns   : ;
 
@@ -287,6 +288,7 @@ completeGame = [opengame|
    outputs   :  (dec1New,dec2New,gameStateNew)  ;
    returns   :         ;
   |]
+
 
 
 -- with a proper subgame
@@ -385,14 +387,6 @@ extractNextState (StochasticStatefulOptic v _) x = do
   pure a
 
 
--- Determine continuation for iterator, with the same repeated strategy, using the pathological endgame
-determineContinuationPayoffsMNY 1        strat action = pure ()
-determineContinuationPayoffsMNY iterator strat action = do
-   extractContinuation executeStrat action
-   nextInput <- ST.lift $ extractNextState executeStrat action
-   determineContinuationPayoffsMNY (pred iterator) strat nextInput
- where executeStrat =  play completeGameMNY strat
-
 
 -- Determine continuation for iterator, with the same repeated strategy, using the pathological endgame
 determineContinuationPayoffs :: Integer
@@ -404,25 +398,60 @@ determineContinuationPayoffs :: Integer
                              -> StateT Vector Stochastic ()
 determineContinuationPayoffs 1        strat action = pure ()
 determineContinuationPayoffs iterator strat action = do
-   extractContinuation executeStrat action
-   nextInput <- ST.lift $ extractNextState executeStrat action
-   determineContinuationPayoffs (pred iterator) strat nextInput
- where executeStrat =  play completeGame strat
+  ST.lift $ note "determineContinuationPayoffs"
+  go  iterator strat action
+  where
+    go  1 strat action = ST.lift $ note "go[1]"
+    go  iterator strat action = do
+      ST.lift $ note ("go[" ++ show iterator ++ "]")
+      extractContinuation executeStrat action
+      ST.lift $ note "nextState"
+      nextInput <- ST.lift $ extractNextState executeStrat action
+      go (pred iterator) strat nextInput
+      where
+        executeStrat = play completeGame strat
 
--- Determine continuation for iterator, with the same repeated strategy, using the pathological endgame no 2
-determineContinuationPayoffs2 :: Integer
+-- Determine continuation for iterator, with the same repeated strategy, using the pathological endgame
+determineContinuationPayoffsDeterm :: Integer
                              ->  List
                                     '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
                                       Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
                                       Kleisli Stochastic () ActionPD, Kleisli Stochastic () ActionPD]
                              -> (ActionPD,ActionPD,EndState)
                              -> StateT Vector Stochastic ()
-determineContinuationPayoffs2 1        strat action = pure ()
-determineContinuationPayoffs2 iterator strat action = do
-   extractContinuation executeStrat action
-   nextInput <- ST.lift $ extractNextState executeStrat action
-   determineContinuationPayoffs (pred iterator) strat nextInput
- where executeStrat =  play completeGame2 strat
+determineContinuationPayoffsDeterm 1        strat action = pure ()
+determineContinuationPayoffsDeterm iterator strat action = do
+  ST.lift $ note "determineContinuationPayoffs"
+  go  iterator strat action
+  where
+    go  1 strat action = ST.lift $ note "go[1]"
+    go  iterator strat action = do
+      ST.lift $ note ("go[" ++ show iterator ++ "]")
+      extractContinuation executeStrat action
+      ST.lift $ note "nextState"
+      nextInput <- ST.lift $ extractNextState executeStrat action
+      go (pred iterator) strat nextInput
+      where
+        executeStrat = play completeGame strat
+
+
+
+
+-- Determine continuation for iterator, with the same repeated strategy, using the pathological endgame
+determineContinuationPayoffsMNY 1        strat action = pure ()
+determineContinuationPayoffsMNY iterator strat action = do
+  ST.lift $ note "determineContinuationPayoffs"
+  go  iterator strat action
+  where
+    go  1 strat action = ST.lift $ note "go[1]"
+    go  iterator strat action = do
+      ST.lift $ note ("go[" ++ show iterator ++ "]")
+      extractContinuation executeStrat action
+      ST.lift $ note "nextState"
+      nextInput <- ST.lift $ extractNextState executeStrat action
+      go (pred iterator) strat nextInput
+      where
+        executeStrat = play completeGameMNY strat
 
 
 
@@ -432,8 +461,10 @@ determineContinuationPayoffs2 iterator strat action = do
 -- Context used for the evaluation of the pathological end state
 contextCont iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> determineContinuationPayoffs iterator strat action)
 
--- Context used for the evaluation of the pathological end state
-contextCont2 iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> determineContinuationPayoffs2 iterator strat action)
+-- Context used for the evaluation of the pathological end state -- deterministic transition
+contextContDeterm iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> determineContinuationPayoffsDeterm iterator strat action)
+
+
 
 -- Context used for the evaluation of the MNY end game
 contextContMNY iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> determineContinuationPayoffsMNY iterator strat action)
@@ -447,9 +478,9 @@ contextContMNY iterator strat initialAction = StochasticStatefulContext (pure ((
 repeatedCompleteGameEq iterator strat initialAction = evaluate completeGame strat context
   where context  = contextCont iterator strat initialAction
 
--- Pathological end state 2
-repeatedCompleteGameEq2 iterator strat initialAction = evaluate completeGame2 strat context
-  where context  = contextCont2 iterator strat initialAction
+-- Pathological end state -- deterministic transition
+repeatedCompleteGameEqDeterm iterator strat initialAction = evaluate completeGameDeterm strat context
+  where context  = contextContDeterm iterator strat initialAction
 
 
 -- Meeting in NY endgame
@@ -457,11 +488,11 @@ repeatedCompleteGameMNYEq iterator strat initialAction = evaluate completeGameMN
   where context  = contextContMNY iterator strat initialAction
 
 -- Show output pathological end game
-eqOutput iterator strat initialAction = generateIsEq $ repeatedCompleteGameEq iterator strat initialAction
+eqOutput iterator = generateIsEq $ repeatedCompleteGameEq iterator strategyTuple (Cooperate,Cooperate,False)
 
--- Show output end state
-eqOutput2 iterator strat initialAction = generateIsEq $ repeatedCompleteGameEq2 iterator strat initialAction
+-- Show output pathological end game
+eqOutputDeterm iterator = generateIsEq $ repeatedCompleteGameEqDeterm iterator strategyTuple (Cooperate,Cooperate,False)
+
 
 -- Show output meeting in NY end game
-eqOutputMYN iterator strat initialAction = generateIsEq $ repeatedCompleteGameMNYEq iterator strat initialAction
-
+eqOutputMYN iterator = generateIsEq $ repeatedCompleteGameMNYEq iterator strategyTupleMNY (Cooperate,Cooperate,False)
