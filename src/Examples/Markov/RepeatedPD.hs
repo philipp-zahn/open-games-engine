@@ -6,7 +6,6 @@
 
 module Examples.Markov.RepeatedPD where
 
-import           Debug.Trace
 import           Engine.Engine
 import           Preprocessor.Preprocessor
 import           Examples.SimultaneousMoves (ActionPD(..),prisonersDilemmaMatrix)
@@ -100,7 +99,7 @@ determineContinuationPayoffs iterator strat action = do
 
 
 -- fix context used for the evaluation
-contextCont iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> trace ",,1" (determineContinuationPayoffs iterator strat action))
+contextCont iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> (determineContinuationPayoffs iterator strat action))
 
 
 
