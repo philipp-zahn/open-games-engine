@@ -16,8 +16,7 @@ module Numeric.Probability.Distribution.Observable
   , Constraint0
   ) where
 
--- import qualified Control.Monad.ConstrainedNormal as C
-import qualified Control.Monad.Free as C
+import qualified Control.Monad.ConstrainedNormal as C
 import qualified Numeric.Probability.Distribution as O
 
 type Constraint0 a = (Ord a)
@@ -25,12 +24,12 @@ type Constraint0 a = (Ord a)
 class Constraint0 a => Constraint a
 instance (Constraint0 a) => Constraint a
 
-newtype T p a = CT { unT :: C.Free (O.T p) a }
+newtype T p a = CT { unT :: C.NM Constraint (O.T p) a }
   deriving (Monad, Functor, Applicative)
 instance Show (T p a) where show _ = "T p a"
 
 lift :: (Constraint0 a, Num p) => O.T p a -> T p a
-lift = CT . C.liftF
+lift = CT . C.liftNM
 
 fromFreqs :: (Constraint0 a, Fractional p, Constraint0 p) => [(a,p)] -> T p a
 fromFreqs = lift . O.fromFreqs
@@ -61,4 +60,4 @@ unlift ::
      forall prob a. (Num prob, Constraint0 a, Fractional prob)
   => T prob a
   -> O.T prob a
-unlift = C.retract . unT
+unlift = C.lowerNM return (>>=) . unT
