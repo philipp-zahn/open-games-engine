@@ -112,3 +112,5 @@ repeatedPDEq iterator strat initialAction = evaluate prisonersDilemma strat cont
 
 
 eqOutput iterator strat initialAction = generateIsEq $ repeatedPDEq iterator strat initialAction
+
+testEq iterator = eqOutput iterator strategyTuple (Cooperate,Cooperate)
