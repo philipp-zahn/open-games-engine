@@ -30,6 +30,9 @@ import           Data.Maybe
 import Data.Kind (Type)
 import Data.Singletons
 import Data.Singletons.TH
+import Data.Singletons.TH
+import Prelude.Singletons
+
 
 $(singletons [d|
     data Choice a b = Choice1 a | Choice2 b
@@ -45,24 +48,27 @@ $(singletons [d|
     extract def f None = def
     |])
 
-class Optic o where
-  lens :: (s -> a) -> (s -> b -> t) -> o s t a b
-  (>>>>) :: o s t a b -> o a b p q -> o s t p q
-  (&&&&) :: o s1 t1 a1 b1 -> o s2 t2 a2 b2 -> o (s1, s2) (t1, t2) (a1, a2) (b1, b2)
-  (++++) :: o s1 t a1 b -> o s2 t a2 b -> o (Choice s1 s2) t (Choice a1 a2) b
+$(singletons [d|
+  class Optic o where
+    lens :: (s -> a) -> (s -> b -> t) -> o s t a b
+    (>>>>) :: o s t a b -> o a b p q -> o s t p q
+    (&&&&) :: o s1 t1 a1 b1 -> o s2 t2 a2 b2 -> o (s1, s2) (t1, t2) (a1, a2) (b1, b2)
+    (++++) :: o s1 t a1 b -> o s2 t a2 b -> o (Choice s1 s2) t (Choice a1 a2) b|])
 
-identity :: (Optic o) => o s t s t
-identity = lens id (flip const)
-
-class Precontext c where
-  void :: c () () () ()
+$(singletons [d|
+  identity :: (Optic o) => o s t s t
+  identity = lens (\x -> x) (\_ x -> x) |])
 
 -- Precontext is a separate class to Context because otherwise the typechecker throws a wobbly
 
-class (Optic o, Precontext c) => Context c o where
-  cmap :: o s1 t1 s2 t2 -> o a1 b1 a2 b2 -> c s1 t1 a2 b2 -> c s2 t2 a1 b1
-  (//) :: (Show s1, Show s2) => o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
-  (\\) :: (Show s1, Show s2) => o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
+$(singletons [d|
+  class Precontext c where
+    cUnit :: c () () () ()
+
+  class (Optic o, Precontext c) => Context c o where
+    cmap :: o s1 t1 s2 t2 -> o a1 b1 a2 b2 -> c s1 t1 a2 b2 -> c s2 t2 a1 b1
+    (//) :: (Show s1, Show s2) => o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
+    (\\) :: (Show s1, Show s2) => o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1|])
 
 $(singletons [d|
   class ContextAdd c where
@@ -106,7 +112,7 @@ data StochasticStatefulContext s t a b where
   StochasticStatefulContext :: Show z => Stochastic (z, s) -> (z -> a -> StateT Vector Stochastic b) -> StochasticStatefulContext s t a b
 
 instance Precontext StochasticStatefulContext where
-  void = StochasticStatefulContext (return ((), ())) (\() () -> return ())
+  cUnit = StochasticStatefulContext (return ((), ())) (\() () -> return ())
 
 instance Context StochasticStatefulContext StochasticStatefulOptic where
   cmap (StochasticStatefulOptic v1 u1) (StochasticStatefulOptic v2 u2) (StochasticStatefulContext h k)

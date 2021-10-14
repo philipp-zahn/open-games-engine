@@ -1,6 +1,7 @@
 module OpenGames
 
 import Data.List
+import Data.Vect
 
 infixr 8 >>>>
 infixl 7 &&&&
@@ -27,9 +28,9 @@ interface (Optic o) => Context (0 c, o : Type -> Type -> Type -> Type -> Type) w
   (\\) : o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
 
 interface ContextAdd (0 c : Type -> Type -> Type -> Type -> Type) where
-  match : c (Either x1 x2) s (Either y1 y2) r 
+  match : c (Either x1 x2) s (Either y1 y2) r
        -> Either (c x1 s y1 r) (c x2 s y2 r)
-  both : c (x, x') (s, s') (y, y') (r, r') -> (c x s y r, c x' s' y' r')
+  -- both : c (x, x') (s, s') (y, y') (r, r') -> (c x s y r, c x' s' y' r')
 
 data TypeList : List Type -> Type where
   Nil : TypeList []
@@ -68,13 +69,13 @@ choice : (select : Bool) -> (b : TypeList ks) -> (b' : TypeList ks')
 choice True b b' = b
 choice False b b' = b'
 
-SequenceTy : Optic o => Context c o 
-         => o x s y r -> o y r z q 
-	 -> (c x s y r -> List Type) 
-	 -> (c y r z q -> List Type) 
+SequenceTy : Optic o => Context c o
+         => o x s y r -> o y r z q
+	 -> (c x s y r -> List Type)
+	 -> (c y r z q -> List Type)
 	 -> (c x s z q -> List Type)
 SequenceTy o1 o2 f g w = f (cmap {o} identity o2 w)
-                     ++ g (cmap {o} o1 identity w)
+                      ++ g (cmap {o} o1 identity w)
 
 TensorTy : {0 c : Type -> Type -> Type -> Type -> Type} ->
            (c x s y r -> List Type) ->
@@ -112,23 +113,36 @@ TensorTy fl fr (l, r) = fl l ++ fr r
       fn args ctx | (Left x) = g.evaluate (left args) x
       fn args ctx | (Right x) = h.evaluate (right args) x
 
-(&&&) : (Optic o, Context c o, ContextAdd c)
-     => {a, a' : List Type}
-     -> {b : c x s y r -> List Type}
-     -> {b' : c x' s' y' r' -> List Type}
-     -> (g1 : OpenGame o c a x s y r b) 
-     -> (g2 : OpenGame o c a' x' s' y' r' b')
-     -> OpenGame o c (a ++ a') (x, x') (s, s') (y, y') (r, r') 
-                     (TensorTy {c} b b' . (OpenGames.both {c}))
-(&&&) g1 g2 = MkGame
-    (\tl => let (l, r) = split tl in g1.play l &&&& g2.play r)
-    eval
-    where
-      eval : TypeList (a ++ a') -> (v : c (x, x') (s, s') (y, y') (r, r'))
-          -> TypeList (TensorTy {c} b b' (both v))
-      eval ty v with (both v)
-        eval ty v | (left, right) = 
-	  let (la, la') = split ty in g1.evaluate la left ++ g2.evaluate la' right
+-- This doesn't work because we can't have `both`
+-- Tensor operator
+-- (&&&) : (Optic o, Context c o, ContextAdd c)
+--      => {a, a' : List Type}
+--      -> {b : c x s y r -> List Type}
+--      -> {b' : c x' s' y' r' -> List Type}
+--      -> (g1 : OpenGame o c a x s y r b)
+--      -> (g2 : OpenGame o c a' x' s' y' r' b')
+--      -> OpenGame o c (a ++ a') (x, x') (s, s') (y, y') (r, r')
+--                      (TensorTy {c} b b' . (OpenGames.both {c}))
+-- (&&&) g1 g2 = MkGame
+--     (\tl => let (l, r) = split tl in g1.play l &&&& g2.play r)
+--     eval
+--     where
+--       eval : TypeList (a ++ a') -> (v : c (x, x') (s, s') (y, y') (r, r'))
+--           -> TypeList (TensorTy {c} b b' (both v))
+--       eval ty v with (both v)
+--         eval ty v | (left, right) = let (la, la') = split ty
+--                                      in g1.evaluate la left ++ g2.evaluate la' right
+
+ReplicateN : (n : Nat) -> List a -> List a
+ReplicateN 0 xs = []
+ReplicateN (S k) xs = xs ++ ReplicateN k xs
+
+testRepl : ReplicateN 3 [Int, String] = [Int, String, Int, String, Int, String]
+testRepl = Refl
+
+-- population operator
+population : (pop : Vect (S n) (OpenGame o c a x s y r b))
+          -> OpenGame o c (ReplicateN (S n) a) (Vect (S n) x) (Vect (S n) s) (Vect (S n) y) (Vect (S n) r) (\vs => ReplicateN (S n) ?nani)
 
 {-
 -}
