@@ -4,8 +4,10 @@ import Data.List
 import Data.Vect
 
 infixr 8 >>>>
-infixl 7 &&&&
-infixl 6 ++++
+infixl 7 &&&, &&&&
+infixl 6 +++, ++++
+
+infixr 5 //, \\
 
 %hide Prelude.either
 
@@ -26,6 +28,10 @@ interface (Optic o) => Context (0 c, o : Type -> Type -> Type -> Type -> Type) w
   cmap : o s1 t1 s2 t2 -> o a1 b1 a2 b2 -> c s1 t1 a2 b2 -> c s2 t2 a1 b1
   (//) : o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
   (\\) : o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
+  both : o s1 t1 a1 b1 -> o s2 t2 a2 b2 
+      -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> (c s2 t2 a2 b2, c s1 t1 a1 b1)
+  both g1 g2 c = (g1 // c, g2 \\ c)
+ 
 
 data TriState a b = One a | Two b | Both a b
 
@@ -41,6 +47,11 @@ interface ContextAdd (0 c : Type -> Type -> Type -> Type -> Type) where
 data TypeList : List Type -> Type where
   Nil : TypeList []
   (::) : (ty : Type) -> TypeList ts -> TypeList (ty :: ts)
+
+Tuplelize : List Type -> Type
+Tuplelize [] = ()
+Tuplelize [x] = x
+Tuplelize (x :: xs) = Pair x (Tuplelize xs)
 
 record OpenGame (o, c : Type -> Type -> Type -> Type -> Type)
                 (a : List Type)
@@ -119,10 +130,9 @@ BigSeq b b' g1 g2 x w = b  (fst (split x)) (cmap {o} identity (g2.play (snd (spl
      => (g1 : OpenGame o c a x1 s y1 r b) -> (g2 : OpenGame o c a' x2 s y2 r b')
    	 -> (TypeList (a ++ a') -> c (Either x1 x2) s (Either y1 y2) r -> List Type)
 ChoiceTy g1 g2 tl ctx = elimTri (b (fst (split tl))) (b' (snd (split tl))) (match ctx)
-                             -- ((l, r), Both x y) => b (fst (split tl)) x ++ b' (snd (split tl)) y
 
 -- Choice operator
-(+++) : {a : _} -> Optic o => Context c o => ContextAdd c
+(+++) : {a, a' : _} -> Optic o => Context c o => ContextAdd c
      => {0 b : TypeList a -> c x1 s y1 r -> List Type}
      -> {0 b' : TypeList a' -> c x2 s y2 r -> List Type}
      -> (g1 : OpenGame o c a x1 s y1 r b) -> (g2 : OpenGame o c a' x2 s y2 r b')
@@ -132,39 +142,46 @@ ChoiceTy g1 g2 tl ctx = elimTri (b (fst (split tl))) (b' (snd (split tl))) (matc
                  (OpenGames.ChoiceTy g1 g2)
 (+++) g h = MkGame
   (\tl => case split tl of (left, right) => g.play left ++++ h.play right)
-  (\tl, body => let f1 = (g.evaluate (fst (split tl)))
-                    f2 = (h.evaluate (snd (split tl)))
-                    m = match body
-                in ?rest)
+  fn
+    where
+      fn : (tl : TypeList (a ++ a'))
+        -> (body : c (Either x1 x2) s (Either y1 y2) r)
+        -> TypeList (elimTri (b (fst (split {ys=a'} tl))) (b' (snd (split {xs=a} tl))) (match body))
+      fn tl body with (split tl)
+        fn tl body | (la, la') with (match body)
+          fn tl body | (la, la') | (One x) = g.evaluate la x
+          fn tl body | (la, la') | (Two x) = h.evaluate la' x
+          fn tl body | (la, la') | (Both x y) = g.evaluate la x ++ h.evaluate la' y
 
---   fn
---   where
---     fn : TypeList (a ++ a') -> (v : c (Either x1 x2) s (Either y1 y2) r) -> TypeList (elimTri b b' (match {y1} {y2} v))
---     fn args ctx with (match ctx)
---       fn args ctx | (One x) = g.evaluate (left args) x
---       fn args ctx | (Two x) = h.evaluate (right args) x
---       fn args ctx | (Both x y) = (g.evaluate (left args) x) ++ (h.evaluate (right args) y)
+Simultaneous : (Optic o, Context c o, ContextAdd c)
+            => {a, a' : List Type}
+            -> {b : TypeList a -> c x s y r -> List Type}
+            -> {b' : TypeList a' -> c x' s' y' r' -> List Type}
+            -> (g1 : OpenGame o c a x s y r b)
+            -> (g2 : OpenGame o c a' x' s' y' r' b')
+            -> TypeList (a ++ a') -> c (x, x') (s, s') (y, y') (r, r') -> List Type 
+Simultaneous g1 g2 tl ctx = case (both (g1.play (fst (split tl))) (g2.play (snd (split tl))) ctx) of
+                                 pair => b (fst (split tl)) (snd pair) ++ b' (snd (split tl)) (fst pair)
 
-{-
--- This doesn't work because we can't have `both`
--- Tensor operator
--- (&&&) : (Optic o, Context c o, ContextAdd c)
---      => {a, a' : List Type}
---      -> {b : c x s y r -> List Type}
---      -> {b' : c x' s' y' r' -> List Type}
---      -> (g1 : OpenGame o c a x s y r b)
---      -> (g2 : OpenGame o c a' x' s' y' r' b')
---      -> OpenGame o c (a ++ a') (x, x') (s, s') (y, y') (r, r')
---                      (TensorTy {c} b b' . (OpenGames.both {c}))
--- (&&&) g1 g2 = MkGame
---     (\tl => let (l, r) = split tl in g1.play l &&&& g2.play r)
---     eval
---     where
---       eval : TypeList (a ++ a') -> (v : c (x, x') (s, s') (y, y') (r, r'))
---           -> TypeList (TensorTy {c} b b' (both v))
---       eval ty v with (both v)
---         eval ty v | (left, right) = let (la, la') = split ty
---                                      in g1.evaluate la left ++ g2.evaluate la' right
+(&&&) : (Optic o, Context c o, ContextAdd c)
+     => {a, a' : List Type}
+     -> {0 b : TypeList a -> c x s y r -> List Type}
+     -> {0 b' : TypeList a' -> c x' s' y' r' -> List Type}
+     -> (g1 : OpenGame o c a x s y r b)
+     -> (g2 : OpenGame o c a' x' s' y' r' b')
+     -> OpenGame o c (a ++ a') (x, x') (s, s') (y, y') (r, r')
+                     (Simultaneous g1 g2)
+(&&&) g1 g2 = MkGame (\tl => let (tl1, tl2) = split tl in g1.play tl1 &&&& g2.play tl2)  
+                     (fn g1 g2)
+  where
+    fn : (g1 : OpenGame o c a x s y r b)
+      -> (g2 : OpenGame o c a' x' s' y' r' b')
+      -> (ls : TypeList (a ++ a')) -> (v : c (x, x') (s, s') (y, y') (r, r')) 
+      -> TypeList (Simultaneous g1 g2 ls v)
+    fn g1 g2 ls v with (split ls)
+      fn g1 g2 ls v | (ls1, ls2) with (both (g1.play ls1) (g2.play ls2) v)
+        fn g1 g2 ls v | (ls1, ls2) | (c1, c2) = g1.evaluate ls1 c2 ++ g2.evaluate ls2 c1
+
 
 ReplicateN : (n : Nat) -> List a -> List a
 ReplicateN 0 xs = []
@@ -174,8 +191,49 @@ testRepl : ReplicateN 3 [Int, String] = [Int, String, Int, String, Int, String]
 testRepl = Refl
 
 -- population operator
-population : (pop : Vect (S n) (OpenGame o c a x s y r b))
-          -> OpenGame o c (ReplicateN (S n) a) (Vect (S n) x) (Vect (S n) s) (Vect (S n) y) (Vect (S n) r) (\vs => ReplicateN (S n) ?nani)
+-- population : (pop : Vect (S n) (OpenGame o c a x s y r b))
+--           -> OpenGame o c (ReplicateN (S n) a) (Vect (S n) x) (Vect (S n) s) (Vect (S n) y) (Vect (S n) r) (\vs => ReplicateN (S n) ?nani)
+-- 
+mergeTwo : (Optic o, Context c o, ContextAdd c) => 
+           {a : _} 
+        -> {0 b : TypeList a -> c x s y r -> List Type}
+        -> (g : OpenGame o c a x s y r b) 
+        -> OpenGame o c (a ++ a) (x, x) (s, s) (y, y) (r, r) (Simultaneous g g)
+mergeTwo g = g &&& g
+
+0 Multipl : (Optic o, Context c o, ContextAdd c) => (k : Nat) -> (g : OpenGame o c a x s y r b) 
+          -> (tl : TypeList a)
+          -> o (Tuplelize (x :: replicate k x)) 
+               (Tuplelize (s :: replicate k s)) 
+               (Tuplelize (y :: replicate k y)) 
+               (Tuplelize (r :: replicate k r)) 
+Multipl 0 g tl = g.play tl
+Multipl (S k) g tl = g.play tl &&&& Multipl k g tl
+
+0
+SimultaneousN : (Optic o, Context c o, ContextAdd c) => (n : Nat) -> (g : OpenGame o c a x s y r b) 
+             -> TypeList (ReplicateN (S n) a) 
+             -> c (Tuplelize (List.replicate (S n) x)) 
+                  (Tuplelize (List.replicate (S n) s)) 
+                  (Tuplelize (List.replicate (S n) y)) 
+                  (Tuplelize (List.replicate (S n) r))
+             -> List Type
+SimultaneousN 0 g z w = b (rewrite sym $ appendNilRightNeutral a in z) w
+SimultaneousN (S k) g z w = let rec = SimultaneousN k g (snd (split z)) (g.play (fst (split z)) // w) 
+                             in b (fst (split z)) ((\\) {o} (Multipl k g (fst (split z))) w) ++ rec
+
+
+mergeN :   (Optic o, Context c o, ContextAdd c) => (n : Nat)
+        -> {a : _} 
+        -> {0 b : TypeList a -> c x s y r -> List Type}
+        -> (g : OpenGame o c a x s y r b) 
+        -> OpenGame o c (ReplicateN (S n) a) 
+                        (Tuplelize (List.replicate (S n) x))
+                        (Tuplelize (List.replicate (S n) s))
+                        (Tuplelize (List.replicate (S n) y))
+                        (Tuplelize (List.replicate (S n) r))
+                        (SimultaneousN n g)
+mergeN n g = ?mergeN_rhs
 
 {-
 -}
