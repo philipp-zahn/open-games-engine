@@ -27,27 +27,29 @@ interface (Optic o) => Context (0 c, o : Type -> Type -> Type -> Type -> Type) w
   (//) : o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
   (\\) : o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
 
+data TriState a b = One a | Two b | Both a b
+
+elimTri : Monoid c => (a -> c) -> (b -> c) -> TriState a b -> c
+elimTri f g (One x) = f x
+elimTri f g (Two y) = g y
+elimTri f g (Both x y) = f x <+> g y
+
 interface ContextAdd (0 c : Type -> Type -> Type -> Type -> Type) where
   match : c (Either x1 x2) s (Either y1 y2) r
-       -> Either (c x1 s y1 r) (c x2 s y2 r)
-  -- both : c (x, x') (s, s') (y, y') (r, r') -> (c x s y r, c x' s' y' r')
+       -> TriState (c x1 s y1 r) (c x2 s y2 r)
 
 data TypeList : List Type -> Type where
   Nil : TypeList []
   (::) : (ty : Type) -> TypeList ts -> TypeList (ty :: ts)
 
-FromList : (ls : List Type) -> TypeList ls
-FromList [] = []
-FromList (x :: xs) = x :: FromList xs
-
 record OpenGame (o, c : Type -> Type -> Type -> Type -> Type)
                 (a : List Type)
                 (x, s, y, r : Type)
-                (f : c x s y r -> List Type)
+                (f : TypeList a -> c x s y r -> List Type)
                 where
   constructor MkGame
   play : TypeList a -> o x s y r
-  evaluate : TypeList a -> (v : c x s y r) -> TypeList (f v)
+  evaluate : (ls : TypeList a) -> (v : c x s y r) -> TypeList (f ls v)
 
 (++) : TypeList xs -> TypeList ys -> TypeList (xs ++ ys)
 (++) [] y = y
@@ -56,7 +58,8 @@ record OpenGame (o, c : Type -> Type -> Type -> Type -> Type)
 split : {xs : _} -> TypeList (xs ++ ys) -> (TypeList xs, TypeList ys)
 split x {xs = []} = ([], x)
 split (y :: ts) {xs = (y :: xs)} =
-  let (xs', ys') = OpenGames.split ts in (y :: xs', ys')
+  case OpenGames.split ts of
+       (xs', ys') => (y :: xs', ys')
 
 left : {xs : _} -> TypeList (xs ++ ys) -> TypeList xs
 left = fst . split
@@ -69,6 +72,13 @@ choice : (select : Bool) -> (b : TypeList ks) -> (b' : TypeList ks')
 choice True b b' = b
 choice False b b' = b'
 
+TensorTy : {0 c : Type -> Type -> Type -> Type -> Type} ->
+           (c x s y r -> List Type) ->
+	         (c x' s' y' r' -> List Type) ->
+           (c x s y r, c x' s' y' r') ->
+	         List Type
+TensorTy fl fr (l, r) = fl l ++ fr r
+
 SequenceTy : Optic o => Context c o
          => o x s y r -> o y r z q
 	 -> (c x s y r -> List Type)
@@ -77,42 +87,65 @@ SequenceTy : Optic o => Context c o
 SequenceTy o1 o2 f g w = f (cmap {o} identity o2 w)
                       ++ g (cmap {o} o1 identity w)
 
-TensorTy : {0 c : Type -> Type -> Type -> Type -> Type} ->
-           (c x s y r -> List Type) ->
-	         (c x' s' y' r' -> List Type) ->
-           (c x s y r, c x' s' y' r') ->
-	         List Type
-TensorTy fl fr (l, r) = fl l ++ fr r
+BigSeq : {a, a' : List Type}
+     -> Optic o => Context c o
+   	 => (b : TypeList a -> c x s y r ->  List Type)
+   	 -> (b' : TypeList a' -> c y r z q ->  List Type)
+     -> OpenGame o c a x s y r b
+     -> OpenGame o c a' y r z q b'
+   	 -> (TypeList (a ++ a') -> c x s z q ->  List Type)
+BigSeq b b' g1 g2 x w = b  (fst (split x)) (cmap {o} identity (g2.play (snd (split x))) w)
+                     ++ b' (snd (split x)) (cmap {o} (g1.play (fst (split x))) identity w)
 
 -- Sequence operator
 (>>>) : {a, a' : List Type } -> (Optic o, Context c o)
-      => (g1 : OpenGame o c a x s y r b) -> (g2 : OpenGame o c a' y r z q b')
-      -> OpenGame o c (a ++ a') x s z q
-                      (SequenceTy {c} {o} (g1.play (FromList a)) (g2.play (FromList a')) b b')
+      => {x, s, y, r, z, q : Type}
+      -> {b : TypeList a -> c x s y r ->  List Type}
+      -> {b' : TypeList a' -> c y r z q ->  List Type}
+      -> (g1 : OpenGame o c a x s y r b) -> (g2 : OpenGame o c a' y r z q b')
+      -> OpenGame o c (a ++ a')
+                      x s z q
+                      (BigSeq {c} {o} b b' g1 g2)
 (>>>) g1 g2 =
   MkGame
     (\tl => case split tl of (left, right) => g1.play left >>>> g2.play right)
-    (\tl, body => case split tl of (left, right) => let v1 = g1.evaluate left (cmap {c} {o} identity (g2.play (FromList a')) body)
-                                                        v2 = g2.evaluate right (cmap {c} {o} (g1.play (FromList a)) identity body)
-                                                     in v1 ++ v2)
+    (\tl, body => g1.evaluate (fst (split tl)) (cmap {c} {o} identity (g2.play (snd (split tl))) body)
+               ++ g2.evaluate (snd (split tl)) (cmap {c} {o} (g1.play (fst (split tl))) identity body))
+
+0 ChoiceTy : {a, a' : List Type}
+     -> {b : TypeList a -> c x1 s y1 r -> List Type}
+     -> {b' : TypeList a' -> c x2 s y2 r -> List Type}
+     -> Optic o => Context c o => ContextAdd c
+     => (g1 : OpenGame o c a x1 s y1 r b) -> (g2 : OpenGame o c a' x2 s y2 r b')
+   	 -> (TypeList (a ++ a') -> c (Either x1 x2) s (Either y1 y2) r -> List Type)
+ChoiceTy g1 g2 tl ctx = elimTri (b (fst (split tl))) (b' (snd (split tl))) (match ctx)
+                             -- ((l, r), Both x y) => b (fst (split tl)) x ++ b' (snd (split tl)) y
 
 -- Choice operator
 (+++) : {a : _} -> Optic o => Context c o => ContextAdd c
-     => (a, a' : List Type)
+     => {0 b : TypeList a -> c x1 s y1 r -> List Type}
+     -> {0 b' : TypeList a' -> c x2 s y2 r -> List Type}
      -> (g1 : OpenGame o c a x1 s y1 r b) -> (g2 : OpenGame o c a' x2 s y2 r b')
      -> OpenGame o c
                  (a ++ a')
                  (Either x1 x2) s (Either y1 y2) r
-                 (either b b' . (OpenGames.match {c} {y1} {y2}))
-(+++) a a' g h = MkGame
+                 (OpenGames.ChoiceTy g1 g2)
+(+++) g h = MkGame
   (\tl => case split tl of (left, right) => g.play left ++++ h.play right)
-  fn
-  where
-    fn : TypeList (a ++ a') -> (v : c (Either x1 x2) s (Either y1 y2) r) -> TypeList (either b b' (match {y1} {y2} v))
-    fn args ctx with (match ctx)
-      fn args ctx | (Left x) = g.evaluate (left args) x
-      fn args ctx | (Right x) = h.evaluate (right args) x
+  (\tl, body => let f1 = (g.evaluate (fst (split tl)))
+                    f2 = (h.evaluate (snd (split tl)))
+                    m = match body
+                in ?rest)
 
+--   fn
+--   where
+--     fn : TypeList (a ++ a') -> (v : c (Either x1 x2) s (Either y1 y2) r) -> TypeList (elimTri b b' (match {y1} {y2} v))
+--     fn args ctx with (match ctx)
+--       fn args ctx | (One x) = g.evaluate (left args) x
+--       fn args ctx | (Two x) = h.evaluate (right args) x
+--       fn args ctx | (Both x y) = (g.evaluate (left args) x) ++ (h.evaluate (right args) y)
+
+{-
 -- This doesn't work because we can't have `both`
 -- Tensor operator
 -- (&&&) : (Optic o, Context c o, ContextAdd c)
