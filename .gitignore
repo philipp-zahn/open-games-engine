@@ -163,3 +163,9 @@ TSWLatexianTemp*
 
 # stack directory
 .stack-work/
+
+# idris build directory
+build/
+
+# idr files
+*.idr~
