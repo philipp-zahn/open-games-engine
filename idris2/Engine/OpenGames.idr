@@ -94,11 +94,11 @@ ChoiceTy g1 g2 tl ctx = elimTri (b (fst (split tl))) (b' (snd (split tl))) (matc
         -> TypeList (elimTri (b (fst (split {ys=a'} tl))) (b' (snd (split {xs=a} tl))) (match body))
       fn tl body with (split tl)
         fn tl body | (la, la') with (match body)
-          fn tl body | (la, la') | (One x) = g.evaluate la x
-          fn tl body | (la, la') | (Two x) = h.evaluate la' x
+          fn tl body | (la, la') | (Choice1 x) = g.evaluate la x
+          fn tl body | (la, la') | (Choice2 x) = h.evaluate la' x
           fn tl body | (la, la') | (Both x y) = g.evaluate la x ++ h.evaluate la' y
 
-Simultaneous : (Optic o, Context c o, ContextAdd c)
+Simultaneous : (Optic o, Context c o, ContextAdd c, Show x, Show x') 
             => {a, a' : List Type}
             -> {b : TypeList a -> c x s y r -> List Type}
             -> {b' : TypeList a' -> c x' s' y' r' -> List Type}
@@ -108,7 +108,7 @@ Simultaneous : (Optic o, Context c o, ContextAdd c)
 Simultaneous g1 g2 tl ctx = case (both (g1.play (fst (split tl))) (g2.play (snd (split tl))) ctx) of
                                  pair => b (fst (split tl)) (snd pair) ++ b' (snd (split tl)) (fst pair)
 
-(&&&) : (Optic o, Context c o, ContextAdd c)
+(&&&) : (Optic o, Context c o, ContextAdd c, Show x, Show x')
      => {a, a' : List Type}
      -> {0 b : TypeList a -> c x s y r -> List Type}
      -> {0 b' : TypeList a' -> c x' s' y' r' -> List Type}
@@ -139,7 +139,7 @@ testRepl = Refl
 -- population : (pop : Vect (S n) (OpenGame o c a x s y r b))
 --           -> OpenGame o c (ReplicateN (S n) a) (Vect (S n) x) (Vect (S n) s) (Vect (S n) y) (Vect (S n) r) (\vs => ReplicateN (S n) ?nani)
 -- 
-mergeTwo : (Optic o, Context c o, ContextAdd c) => 
+mergeTwo : (Optic o, Context c o, ContextAdd c, Show x) => 
            {a : _} 
         -> {0 b : TypeList a -> c x s y r -> List Type}
         -> (g : OpenGame o c a x s y r b) 
@@ -155,6 +155,7 @@ mergeTwo g = g &&& g
 Multipl 0 g tl = g.play tl
 Multipl (S k) g tl = g.play tl &&&& Multipl k g tl
 
+{-
 0
 SimultaneousN : (Optic o, Context c o, ContextAdd c) => (n : Nat) -> (g : OpenGame o c a x s y r b) 
              -> TypeList (ReplicateN (S n) a) 
