@@ -4,7 +4,8 @@ module Data.TLL
 public export
 data TypeList : List Type -> Type where
   Nil : TypeList []
-  (::) : (ty : Type) -> TypeList ts -> TypeList (ty :: ts)
+  (::) : (_ : ty) -> TypeList ts -> TypeList (ty :: ts)
+
 
 public export
 Tuplelize : List Type -> Type
@@ -20,9 +21,7 @@ public export
 public export
 split : {xs : _} -> TypeList (xs ++ ys) -> (TypeList xs, TypeList ys)
 split x {xs = []} = ([], x)
-split (y :: ts) {xs = (y :: xs)} =
-  case TLL.split ts of
-       (xs', ys') => (y :: xs', ys')
+split (x :: z) {xs = (y :: xs)} = let (p1, p2) = split z in (x :: p1, p2)
 
 public export
 left : {xs : _} -> TypeList (xs ++ ys) -> TypeList xs
@@ -38,3 +37,5 @@ choice : (select : Bool) -> (b : TypeList ks) -> (b' : TypeList ks')
 choice True b b' = b
 choice False b b' = b'
 
+{-
+-}

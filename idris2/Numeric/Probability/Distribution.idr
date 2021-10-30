@@ -1,9 +1,20 @@
 module Numeric.Probability.Distribution
 
+import Data.List
+
 export
 record T (prob, a : Type) where
   constructor MkProb
   getProb : List (a, prob)
+
+export
+Show p => Show a => Show (T p a) where
+  show (MkProb d) = "distribution: \{show d}"
+
+-- Show p => Show a => Interpolation (T p a) where
+--   interpolate (MkProb d) = show d
+-- 
+
 
 export
 (.decons) : T prob a -> List (a, prob)
@@ -16,6 +27,15 @@ certainly x = MkProb (pure (x, 1))
 export
 fromFreqs : (Fractional prob) => List (a,prob) -> T prob a
 fromFreqs xs = let q = sum (map snd xs) in MkProb (map (\(x,p) => (x,p/q)) xs)
+
+export
+mapMaybe : (Fractional p) => (a -> Maybe b) -> T p a -> T p b
+mapMaybe f =
+    fromFreqs . mapMaybe (\(x, p) => (, p) <$> f x) . getProb
+
+export
+expected : (Num a) => T a a -> a
+expected = sum . map (uncurry (*)) . getProb
 
 export
 Functor (T p) where

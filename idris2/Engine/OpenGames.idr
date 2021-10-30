@@ -10,15 +10,11 @@ infixr 8 >>>>
 infixl 7 &&&, &&&&
 infixl 6 +++, ++++
 
-%hide Prelude.either
-
-either : (a -> c) -> (b -> c) -> Either a b -> c
-either f g (Left a) = f a
-either f g (Right b) = g b
-
+public export
 identity : (Optic o) => o s t s t
 identity = lens id (flip const)
 
+public export
 record OpenGame (o, c : Type -> Type -> Type -> Type -> Type)
                 (a : List Type)
                 (x, s, y, r : Type)
@@ -28,6 +24,7 @@ record OpenGame (o, c : Type -> Type -> Type -> Type -> Type)
   play : TypeList a -> o x s y r
   evaluate : (ls : TypeList a) -> (v : c x s y r) -> TypeList (f ls v)
 
+public export
 TensorTy : {0 c : Type -> Type -> Type -> Type -> Type} ->
            (c x s y r -> List Type) ->
 	         (c x' s' y' r' -> List Type) ->
@@ -35,6 +32,7 @@ TensorTy : {0 c : Type -> Type -> Type -> Type -> Type} ->
 	         List Type
 TensorTy fl fr (l, r) = fl l ++ fr r
 
+public export
 SequenceTy : Optic o => Context c o
          => o x s y r -> o y r z q
 	 -> (c x s y r -> List Type)
@@ -43,6 +41,7 @@ SequenceTy : Optic o => Context c o
 SequenceTy o1 o2 f g w = f (cmap {o} identity o2 w)
                       ++ g (cmap {o} o1 identity w)
 
+public export
 BigSeq : {a, a' : List Type}
      -> Optic o => Context c o
    	 => (b : TypeList a -> c x s y r ->  List Type)
@@ -54,6 +53,7 @@ BigSeq b b' g1 g2 x w = b  (fst (split x)) (cmap {o} identity (g2.play (snd (spl
                      ++ b' (snd (split x)) (cmap {o} (g1.play (fst (split x))) identity w)
 
 -- Sequence operator
+export
 (>>>) : {a, a' : List Type } -> (Optic o, Context c o)
       => {x, s, y, r, z, q : Type}
       -> {b : TypeList a -> c x s y r ->  List Type}
@@ -67,7 +67,7 @@ BigSeq b b' g1 g2 x w = b  (fst (split x)) (cmap {o} identity (g2.play (snd (spl
     (\tl => case split tl of (left, right) => g1.play left >>>> g2.play right)
     (\tl, body => g1.evaluate (fst (split tl)) (cmap {c} {o} identity (g2.play (snd (split tl))) body)
                ++ g2.evaluate (snd (split tl)) (cmap {c} {o} (g1.play (fst (split tl))) identity body))
-
+public export
 0 ChoiceTy : {a, a' : List Type}
      -> {b : TypeList a -> c x1 s y1 r -> List Type}
      -> {b' : TypeList a' -> c x2 s y2 r -> List Type}
@@ -77,6 +77,7 @@ BigSeq b b' g1 g2 x w = b  (fst (split x)) (cmap {o} identity (g2.play (snd (spl
 ChoiceTy g1 g2 tl ctx = elimTri (b (fst (split tl))) (b' (snd (split tl))) (match ctx)
 
 -- Choice operator
+export
 (+++) : {a, a' : _} -> Optic o => Context c o => ContextAdd c
      => {0 b : TypeList a -> c x1 s y1 r -> List Type}
      -> {0 b' : TypeList a' -> c x2 s y2 r -> List Type}
@@ -98,6 +99,7 @@ ChoiceTy g1 g2 tl ctx = elimTri (b (fst (split tl))) (b' (snd (split tl))) (matc
           fn tl body | (la, la') | (Choice2 x) = h.evaluate la' x
           fn tl body | (la, la') | (Both x y) = g.evaluate la x ++ h.evaluate la' y
 
+public export
 Simultaneous : (Optic o, Context c o, ContextAdd c, Show x, Show x') 
             => {a, a' : List Type}
             -> {b : TypeList a -> c x s y r -> List Type}
@@ -108,6 +110,7 @@ Simultaneous : (Optic o, Context c o, ContextAdd c, Show x, Show x')
 Simultaneous g1 g2 tl ctx = case (both (g1.play (fst (split tl))) (g2.play (snd (split tl))) ctx) of
                                  pair => b (fst (split tl)) (snd pair) ++ b' (snd (split tl)) (fst pair)
 
+export
 (&&&) : (Optic o, Context c o, ContextAdd c, Show x, Show x')
      => {a, a' : List Type}
      -> {0 b : TypeList a -> c x s y r -> List Type}

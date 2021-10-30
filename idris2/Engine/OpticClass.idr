@@ -1,8 +1,9 @@
 module Engine.OpticClass 
 
 import Data.TriState
+import Data.SortedMap
 import Control.Monad.State
-import Numeric.Probability.Distribution
+import public Numeric.Probability.Distribution
 
 infixr 5 //, \\
 infixr 8 >>>>
@@ -40,6 +41,7 @@ interface (Optic o) => Context (0 c, o : Type -> Type -> Type -> Type -> Type) w
 public export
 Vector : Type
 Vector = String -> Double
+
 
 public export
 Stochastic : Type -> Type
