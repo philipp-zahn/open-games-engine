@@ -12,6 +12,7 @@ interface Map constraint (0 m : Type -> Type -> Type) where
 
   ||| A map with a single element
   singleton : constraint k => k -> v -> m k v
+
   ||| merging two maps and using the provided function to deal with collisions
   mergeWith : constraint k => (v -> v -> v) -> m k v -> m k v -> m k v
 
@@ -58,6 +59,7 @@ namespace List
     lookup = List.lookup
 
 namespace SortedMap
+  export
   implementation Map Ord SortedMap where
     empty = empty
     singleton = SortedMap.singleton
@@ -67,6 +69,8 @@ namespace SortedMap
     mapVals = map
 
 namespace Hashtable
+
+  export
   implementation Map (const ()) HashMap where
     empty = empty
     singleton = Hashtable.singleton

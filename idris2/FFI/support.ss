@@ -15,9 +15,9 @@
         ((#f) 0)
         ((#t) 1)))
 
-(define (idris-hashtable-update k v ht key f)
+(define (idris-hashtable-update k v ht key f def)
   (let ((new (hashtable-copy ht #t)))
-       (begin (hashtable-update! new key f)
+       (begin (hashtable-update! new key f def)
               new)))
 
 (define (idris-hashtable-delete k v ht key)

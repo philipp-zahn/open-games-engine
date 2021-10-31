@@ -18,6 +18,7 @@ modules = Data.FastMap,
           Engine.Engine,
           Engine.OpenGames,
           Engine.OpticClass,
+          Preprocessor.AbstractSyntax,
           Numeric.Probability.Distribution,
           Numeric.Probability.Distribution.Fast,
           Numeric.Probability.Distribution.Observable
