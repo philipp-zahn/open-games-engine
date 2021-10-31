@@ -1,11 +1,16 @@
 module Numeric.Probability.Distribution
 
 import Data.List
+import Data.Map.Interface
+
+record GenericDistribution (m : Type -> Type -> Type) {auto imap : Map m} (prob, a : Type) where
+  constructor MkGenDist
+  getProb : m a prob
+
 
 export
-record T (prob, a : Type) where
-  constructor MkProb
-  getProb : List (a, prob)
+T : (prob, a : Type) -> Type
+T = GenericDistribution (\a, p => List (a, p))
 
 export
 Show p => Show a => Show (T p a) where
@@ -13,7 +18,7 @@ Show p => Show a => Show (T p a) where
 
 -- Show p => Show a => Interpolation (T p a) where
 --   interpolate (MkProb d) = show d
--- 
+--
 
 
 export
@@ -44,7 +49,7 @@ Functor (T p) where
 export
 Num p => Applicative (T p) where
   pure = certainly
-  (<*>) (MkProb fs) (MkProb ys) = 
+  (<*>) (MkProb fs) (MkProb ys) =
     MkProb [(f x,q*p) | (f,p) <- fs, (x,q) <- ys]
 
 export
