@@ -1,13 +1,7 @@
-package opengames
--- version =
--- authors =
--- maintainers =
--- license =
--- brief =
--- readme =
--- homepage =
--- sourceloc =
--- bugtracker =
+package open-games-idris
+version = 0.0
+authors = "Andre Videla, Philipp Zahn"
+maintainers = "Andre Videla"
 
 -- packages to add to search path
 depends = contrib
@@ -32,9 +26,13 @@ modules = Data.FastMap,
 -- main =
 
 -- name of executable
--- executable =
+executable = "OG-idris"
+
+-- options
 opts = "--directive extraRuntime=idris2/FFI/support.ss"
+
 sourcedir = "idris2"
+
 -- builddir =
 -- outputdir =
 
