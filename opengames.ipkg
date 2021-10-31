@@ -1,0 +1,57 @@
+package opengames
+-- version =
+-- authors =
+-- maintainers =
+-- license =
+-- brief =
+-- readme =
+-- homepage =
+-- sourceloc =
+-- bugtracker =
+
+-- packages to add to search path
+depends = contrib
+
+-- modules to install
+modules = Data.FastMap,
+          Data.Hash,
+          Data.Map.Interface,
+          Data.TLL,
+          Data.TriState,
+          Engine.AtomicGames,
+          Engine.BayesianGames,
+          Engine.Diagnostics,
+          Engine.Engine,
+          Engine.OpenGames,
+          Engine.OpticClass,
+          Numeric.Probability.Distribution,
+          Numeric.Probability.Distribution.Fast,
+          Numeric.Probability.Distribution.Observable
+
+-- main file (i.e. file to load at REPL)
+-- main =
+
+-- name of executable
+-- executable =
+opts = "--directive extraRuntime=idris2/FFI/support.ss"
+sourcedir = "idris2"
+-- builddir =
+-- outputdir =
+
+-- script to run before building
+-- prebuild =
+
+-- script to run after building
+-- postbuild =
+
+-- script to run after building, before installing
+-- preinstall =
+
+-- script to run after installing
+-- postinstall =
+
+-- script to run before cleaning
+-- preclean =
+
+-- script to run after cleaning
+-- postclean =

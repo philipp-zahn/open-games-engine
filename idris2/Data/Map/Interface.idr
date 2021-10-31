@@ -2,6 +2,7 @@ module Data.Map.Interface
 
 import Data.List
 import Data.SortedMap
+import FFI.Hashtable
 
 public export
 interface Map constraint (0 m : Type -> Type -> Type) where
@@ -65,5 +66,12 @@ namespace SortedMap
     lookup = lookup
     mapVals = map
 
-
+namespace Hashtable
+  implementation Map (const ()) HashMap where
+    empty = empty
+    singleton = Hashtable.singleton
+    mergeWith = ?noMerge -- Hashtable.mergeWith
+    mapKeysWith f v = ?noMapKeys -- fromList . normaliseWith v . map (mapFst f) . toList
+    lookup = lookup
+    mapVals = map
 
