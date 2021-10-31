@@ -33,12 +33,15 @@ implementation Show (Expressions String) where show = tuple . exps
 --   show (AtomExpression e) = concat ["(", e, ")"]
 
 -- Function expressions are Haskell expressions used as inputs to fromLens (from the class OG)
+public export
 data FunctionExpression p e = Identity                                 -- \x -> x
                             | Copy                                     -- \x -> (x, x)
                             | Lambda (Variables p) (Expressions e)     -- \(x1, ..., xm) -> (e1, ..., en)
                             | CopyLambda (Variables p) (Expressions e) -- \(x1, ..., xm) -> ((x1, ..., xm), (e1, ..., en))
                             | Multiplex (Variables p) (Variables p)    -- \((x1, ..., xm), (y1, ..., yn)) -> (x1, ..., xm, y1, ..., yn)
                             | Curry (FunctionExpression p e)           -- curry f
+
+export
 Functor (FunctionExpression p) where
   map f Identity         = Identity
   map f Copy             = Copy
@@ -47,6 +50,7 @@ Functor (FunctionExpression p) where
   map f (Multiplex x y)  = Multiplex x y
   map f (Curry x)        = Curry (map f x)
 
+export
 implementation Bifunctor FunctionExpression where
   mapFst f Identity = Identity
   mapFst f Copy = Copy
@@ -59,6 +63,7 @@ implementation Bifunctor FunctionExpression where
 flattenVariables : List (Variables p) -> Variables p
 flattenVariables = MkVariables . concat . map vars
 
+export
 implementation Show (FunctionExpression String String) where
   show Identity         = "\\x -> x"
   show Copy             = "\\x -> (x, x)"
@@ -69,6 +74,7 @@ implementation Show (FunctionExpression String String) where
 
 -- The main abstract datatype targeted by the compiler
 -- p stands for "patterns", e for "expressions"
+public export
 data FreeOpenGame p e = Atom e
                       | Lens (FunctionExpression p e) (FunctionExpression p e)
                       | Function (FunctionExpression p e) (FunctionExpression p e)
@@ -76,6 +82,7 @@ data FreeOpenGame p e = Atom e
                       | Sequential (FreeOpenGame p e) (FreeOpenGame p e)
                       | Simultaneous (FreeOpenGame p e) (FreeOpenGame p e)
 
+export
 Functor (FreeOpenGame p) where
   map f (Atom x) = Atom (f x)
   map f (Lens x y) = Lens (map f x) (map f y)
@@ -84,7 +91,7 @@ Functor (FreeOpenGame p) where
   map f (Sequential x y) = Sequential (map f x) (map f y)
   map f (Simultaneous x y) = Simultaneous (map f x) (map f y)
 
-
+export
 implementation Bifunctor FreeOpenGame where
   mapFst f (Atom e) = Atom e
   mapFst f (Lens f1 f2) = Lens (mapFst f f1) (mapFst f f2)
@@ -94,6 +101,7 @@ implementation Bifunctor FreeOpenGame where
   mapFst f (Simultaneous f1 f2) = Simultaneous (mapFst f f1) (mapFst f f2)
   mapSnd = map
 
+export
 implementation Show (FreeOpenGame String String)  where
   show (Atom e)           = concat ["(",  e, ")"]
   show (Lens v u)         = concat ["fromLens (", show v, ") (", show u, ")"]
