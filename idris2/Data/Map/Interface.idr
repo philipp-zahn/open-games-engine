@@ -69,6 +69,7 @@ namespace List
     toList = id
 
 namespace SortedMap
+
   export
   implementation Map Ord SortedMap where
     empty = empty

@@ -1,6 +1,9 @@
 module Preprocessor.AbstractSyntax
 
 import Control.Comonad
+import Generics.Derive
+
+%language ElabReflection
 
 -- The user interacts with the preprocessor by creating instances of the datatypes in this file
 -- and then calling functions from Compiler on it
@@ -30,6 +33,8 @@ record Line (p, e : Type) where
   matrix               : e
   covariantOutputs     : List p
   contravariantInputs  : List e
+
+%runElab derive "Line" [Generic, Meta, Eq, Show]
 
 pureLine : a -> Line p a
 pureLine v = MkLine [] [] v [] []
@@ -76,6 +81,8 @@ record Block (p, e : Type) where
   blockLines : List (Line p e)
   blockCovariantOutputs : List e
   blockContravariantInputs : List p
+
+%runElab derive "Block" [Generic, Meta, Eq, Show]
 
 export
 Functor (Block p) where

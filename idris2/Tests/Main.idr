@@ -1,7 +1,23 @@
 module Tests.Main
 
 import Engine.Engine
-import Preprocessor.Lambda
+import Preprocessor.Parser
 
+atomicGameInput : String
+atomicGameInput = #"""
+    inputs    : x ;
+    feedback  :   ;
+    
+    :-----:
+    inputs    : x ;
+    feedback  :   ;
+    operation : dependentDecision playerName (\y -> actionSpace) ;
+    outputs   : y ;
+    returns   : payoffFunction y x r ;
+    :-----:
+    
+    outputs  : y ;
+    returns  : r ;
+    """#
 main : IO ()
-main = putStrLn "Success"
+main = print (parseVerbose atomicGameInput)

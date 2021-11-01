@@ -4,7 +4,7 @@ authors = "Andre Videla, Philipp Zahn"
 maintainers = "Andre Videla"
 
 -- packages to add to search path
-depends = contrib
+depends = contrib, elab-util, sop
 
 -- modules to install
 modules = Data.FastMap,
