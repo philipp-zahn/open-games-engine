@@ -3,14 +3,14 @@ module Numeric.Probability.Distribution
 import Data.List
 import Data.Map.Interface
 
-record GenericDistribution (m : Type -> Type -> Type) {auto imap : Map m} (prob, a : Type) where
-  constructor MkGenDist
-  getProb : m a prob
-
+-- record GenericDistribution (m : Type -> Type -> Type) {auto imap : Map m} (prob, a : Type) where
+--   constructor MkGenDist
+--   getProb : m a prob
 
 export
-T : (prob, a : Type) -> Type
-T = GenericDistribution (\a, p => List (a, p))
+record T (prob, a : Type) where
+  constructor MkProb
+  getProb : LookupList a prob
 
 export
 Show p => Show a => Show (T p a) where

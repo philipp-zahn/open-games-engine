@@ -13,6 +13,9 @@ interface Map constraint (0 m : Type -> Type -> Type) where
   ||| A map with a single element
   singleton : constraint k => k -> v -> m k v
 
+  ||| Delete a key from the map, id if the key isn't found
+  delete : constraint k => k -> m k v -> m k v
+
   ||| merging two maps and using the provided function to deal with collisions
   mergeWith : constraint k => (v -> v -> v) -> m k v -> m k v -> m k v
 
@@ -24,6 +27,10 @@ interface Map constraint (0 m : Type -> Type -> Type) where
 
   ||| Lookup a value in the map
   lookup : Eq k => k -> m k v -> Maybe v
+  
+  ||| List conversion
+  fromList : constraint k => List (k, v) -> m k v
+  toList : m k v -> List (k, v)
 
 export
 mapKeys : Map c m => c k' => Semigroup v => (k -> k') -> m k v -> m k' v
@@ -53,20 +60,26 @@ namespace List
   implementation Map Eq LookupList where
     empty = []
     singleton k v = pure (k, v)
+    delete k = filter ((/= k) . fst)
     mergeWith f = normaliseWith f .: List.(++)
     mapKeysWith f v = normaliseWith v . map (mapFst f)
     mapVals f = map (mapSnd f)
     lookup = List.lookup
+    fromList = id
+    toList = id
 
 namespace SortedMap
   export
   implementation Map Ord SortedMap where
     empty = empty
     singleton = SortedMap.singleton
+    delete = SortedMap.delete 
     mergeWith = SortedMap.mergeWith
-    mapKeysWith f v = fromList . normaliseWith v . map (mapFst f) . toList
+    mapKeysWith f v = SortedMap.fromList . normaliseWith v . map (mapFst f) . SortedMap.toList
     lookup = lookup
     mapVals = map
+    fromList = SortedMap.fromList
+    toList = SortedMap.toList
 
 namespace Hashtable
 
@@ -74,8 +87,11 @@ namespace Hashtable
   implementation Map (const ()) HashMap where
     empty = empty
     singleton = Hashtable.singleton
+    delete = Hashtable.delete 
     mergeWith = ?noMerge -- Hashtable.mergeWith
     mapKeysWith f v = ?noMapKeys -- fromList . normaliseWith v . map (mapFst f) . toList
     lookup = lookup
     mapVals = map
+    fromList = Hashtable.fromList
+    toList = Hashtable.toList
 

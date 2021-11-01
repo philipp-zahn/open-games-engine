@@ -24,7 +24,7 @@ modules = Data.FastMap,
           Numeric.Probability.Distribution.Observable
 
 -- main file (i.e. file to load at REPL)
--- main =
+main = Tests.Main
 
 -- name of executable
 executable = "OG-idris"
