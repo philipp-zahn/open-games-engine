@@ -1,7 +1,7 @@
 -- A parser for Lambda Calculus
 module Preprocessor.Parser
 
-import public Preprocessor.AbstractSyntax
+import public Preprocessor.BlockSyntax
 import Data.String.Parser
 import Data.String.Parser.Expression
 import public Data.List1
@@ -47,8 +47,8 @@ mutual
     | Tuple Lambda Lambda (List Lambda)
     | Range LRange
     | IfThenElse Lambda Lambda Lambda
-    | Ifix String Lambda Lambda
-    | PFix String Lambda
+    | IFixOp String Lambda Lambda
+    | PFixOp String Lambda
     | LLet Pattern Lambda Lambda
     | Unbound String
 
@@ -168,7 +168,7 @@ contents : Parser a -> Parser a
 contents p = spaces *> p <* eos
 
 mkInfix : String -> Parser (Lambda -> Lambda -> Lambda)
-mkInfix op = reservedOp op >> pure (Ifix op)
+mkInfix op = reservedOp op >> pure (IFixOp op)
 
 -- stirng literals do not escape for now
 stringLiteral : Parser String
@@ -199,7 +199,7 @@ operators = [ [Infix (mkInfix "$") AssocRight]
               ,Infix (mkInfix "<=") AssocNone
               ,Infix (mkInfix ">=") AssocNone
               ]
-            , [Prefix (reservedOp "-" *> pure (PFix "-"))]
+            , [Prefix (reservedOp "-" *> pure (PFixOp "-"))]
             , [Infix (mkInfix "++") AssocRight]
             , [Infix (mkInfix "+") AssocLeft
               ,Infix (mkInfix "-") AssocLeft
@@ -364,7 +364,7 @@ parseVerboseLine parseP parseE = do
 parseVerboseSyntax : Show p => Show e => Parser p -> Parser e -> Parser (Block p e)
 parseVerboseSyntax parseP parseE =
   do (covIn, conOut) <- (parseInput parseP parseE <* parseDelimiter) 
-     lines <- some (parseVerboseLine parseP parseE)
+     lines <- many1 (parseVerboseLine parseP parseE)
      (covOut,conIn) <- (parseDelimiter *> parseOutput parseE parseP)
      pure $ MkBlock covIn conOut lines covOut conIn
 

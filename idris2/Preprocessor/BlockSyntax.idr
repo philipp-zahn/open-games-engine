@@ -1,7 +1,8 @@
-module Preprocessor.AbstractSyntax
+module Preprocessor.BlockSyntax
 
 import Control.Comonad
 import Generics.Derive
+import public Data.List1
 
 %language ElabReflection
 
@@ -78,7 +79,7 @@ record Block (p, e : Type) where
   constructor MkBlock 
   blockCovariantInputs : List p 
   blockContravariantOutputs : List e
-  blockLines : List (Line p e)
+  blockLines : List1 (Line p e)
   blockCovariantOutputs : List e
   blockContravariantInputs : List p
 
@@ -98,9 +99,9 @@ implementation Applicative (Block p) where
         mapLines : List (Line p (a -> b)) -> List a -> List b
         mapLines f as = map extract f <*> as
       in MkBlock covIn
-            (mapLines f conOut)
+            (mapLines (forget f) conOut)
             (map (<*>) f <*> m)
-            (mapLines f covOut)
+            (mapLines (forget f) covOut)
             conIn
 
 export

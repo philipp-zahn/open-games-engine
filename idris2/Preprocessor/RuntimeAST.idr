@@ -4,18 +4,22 @@ module Preprocessor.RuntimeAST
 import Data.List 
 
 ||| Variables are just lists of patterns
+public export
 record Variables  p where
   constructor MkVariables 
   vars : List p
 
+export
 Functor Variables where
   map f = MkVariables . map f . vars
 
 ||| Expressions are list of expressions
+public export
 record Expressions e where 
   constructor MkExpressions 
   exps : List e
 
+export
 Functor Expressions where
   map f = MkExpressions . map f . exps
 
@@ -23,7 +27,9 @@ tuple : List String -> String
 tuple [x] = x
 tuple xs = "(" ++ fastPack (intercalate (fastUnpack ", ") (map fastUnpack xs)) ++ ")"
 
+export
 implementation Show (Variables String) where show = tuple . vars
+export
 implementation Show (Expressions String) where show = tuple . exps
 
 
@@ -60,6 +66,7 @@ implementation Bifunctor FunctionExpression where
   mapFst f (Curry fe) = Curry (mapFst f fe)
   mapSnd = map
 
+export
 flattenVariables : List (Variables p) -> Variables p
 flattenVariables = MkVariables . concat . map vars
 
