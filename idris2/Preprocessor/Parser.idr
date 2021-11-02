@@ -24,7 +24,7 @@ Show Literal where
   show (LInt x) = show x
   show (LBool x) = show x
   show (LString x) = x
-  
+
 public export
 data Pattern
   = PVar String                -- Just a variable
@@ -102,9 +102,9 @@ logStatus = P $ \s => trace "Log as position \{s.pos}, next \{leading} character
 
 
 traceP : Monad m => ParseT m a -> ParseT m a
-traceP (P st) = trace "tracing parser" $ P $ \(S inp max pos) => 
+traceP (P st) = trace "tracing parser" $ P $ \(S inp max pos) =>
                 let () = trace "position before : \{pos}" () in
-                do res <- st (S inp max pos) 
+                do res <- st (S inp max pos)
                    let () = case the (Result a) res of
                         OK v st => the Unit (trace "parse succeeeded, consumed : \{take (cast (st.pos - pos))inp}" ())
                         Fail newPos msg => trace "parse failed with error \{show msg}, new position is : \{newPos}" ()
@@ -113,9 +113,9 @@ traceP (P st) = trace "tracing parser" $ P $ \(S inp max pos) =>
 try : Functor m => ParseT m a -> ParseT m a
 try (P runParser) =
     P $ \st => rollbackPos st <$> runParser st
-    where 
+    where
         rollbackPos : State -> Result a -> Result a
-        rollbackPos s (Fail a b ) = Fail s.pos b 
+        rollbackPos s (Fail a b ) = Fail s.pos b
         rollbackPos s (OK a b)   = OK a b
 
 mutual
@@ -126,11 +126,11 @@ mutual
                               ; pure (x::xs)
                               } <|> pure [x]
                           }
-  
-  
+
+
   sepEndBy :  Parser a -> Parser sep -> Parser (List a)
   sepEndBy p sep = sepEndBy1 p sep <|> pure []
-  
+
 colon : Parser ()
 colon = token ":"
 
@@ -138,7 +138,7 @@ semi : Parser ()
 semi = token ";"
 
 choice : List (Parser a) -> Parser a
-choice = foldr (\x, y => x <|> y) empty 
+choice = foldr (\x, y => x <|> y) empty
 
 oneOf : String -> Parser Char
 oneOf xs = foldr (\x, y => x <|> y) (fail "none of \{show xs}") (map (char) (unpack xs))
@@ -216,7 +216,7 @@ infixParser lambda = buildExpressionParser Lambda operators lambda
 
 -- ^ Parse a variable as a Lambda term
 variable : Parser Lambda
-variable = Var <$> identifier 
+variable = Var <$> identifier
 
 -- ^ Parse an Integer as a Lambda term
 number : Parser Lambda
@@ -224,14 +224,14 @@ number = (pure $ Lit (LInt (cast !natural))) <?> "natural"
 
 -- ^ Parse a string literal as a Lambda term
 strLit : Parser Lambda
-strLit = Lit . LString <$> stringLiteral 
+strLit = Lit . LString <$> stringLiteral
 
 -- ^ Parse two things in sequence and bundle them in a pair
 pair : Parser a -> Parser b -> Parser (a, b)
 pair p1 p2 = do r1 <- p1; r2 <- p2; pure (r1, r2)
 
 parseLit : Parser Literal
-parseLit = LString <$> stringLiteral 
+parseLit = LString <$> stringLiteral
        <|> LInt . cast <$> natural
 
 parseUnbound : Parser Lambda
@@ -252,7 +252,7 @@ parsePattern =
   <|> PList <$> brackets (commaSep parsePattern)
   <|> PLit <$> parseLit
 
-mutual 
+mutual
   doNotation : Parser Lambda
   doNotation =
     Do <$> (reserved "do"
@@ -359,11 +359,11 @@ parseVerboseLine parseP parseE = do
   (covIn, conOut) <- option ([], []) (parseInput parseE parseP)
   program <- reserved "operation" *> colon *> parseE <* semi
   (covOut,conIn) <- option ([], []) (parseOutput parseP parseE)
-  pure $ MkLine covIn conOut program covOut conIn 
+  pure $ MkLine covIn conOut program covOut conIn
 
 parseVerboseSyntax : Show p => Show e => Parser p -> Parser e -> Parser (Block p e)
 parseVerboseSyntax parseP parseE =
-  do (covIn, conOut) <- (parseInput parseP parseE <* parseDelimiter) 
+  do (covIn, conOut) <- (parseInput parseP parseE <* parseDelimiter)
      lines <- many1 (parseVerboseLine parseP parseE)
      (covOut,conIn) <- (parseDelimiter *> parseOutput parseE parseP)
      pure $ MkBlock covIn conOut lines covOut conIn
@@ -371,11 +371,11 @@ parseVerboseSyntax parseP parseE =
 parseAll : Parser a -> String -> Either String a
 parseAll p input = case parse p input of
                         Left fail => Left fail
-                        Right (v, pos) => if pos < cast (length input) 
+                        Right (v, pos) => if pos < cast (length input)
                                              then Left "only consumed \{take (cast pos) input}"
                                              else Right v
 
 
 export
 parseVerbose : String -> Either String (Block Pattern Lambda)
-parseVerbose = parseAll (logStatus *> parseVerboseSyntax parsePattern expr) 
+parseVerbose = parseAll (logStatus *> parseVerboseSyntax parsePattern expr)

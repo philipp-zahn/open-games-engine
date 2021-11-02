@@ -25,7 +25,7 @@ record LineWithContext (p, e : Type) where
 -- The business end of the compiler
 
 compileLine : LineWithContext p e -> FreeOpenGame p e
-compileLine (MkLineCtx l cov con) = 
+compileLine (MkLineCtx l cov con) =
   let l1 = Function (CopyLambda cov (MkExpressions (covariantInputs l))) (Multiplex con (MkVariables (contravariantOutputs l)))
       l2 = Simultaneous (Function Identity Identity) (Atom (matrix l))
       l3 = Function (Multiplex cov (MkVariables $ (covariantOutputs l)))
@@ -62,16 +62,16 @@ vectToList1 (x :: xs) = x ::: toList xs
 
 ||| Extract all the covariant variables from each line inside the block
 covariantContexts : Block p e -> List1 (Variables p)
-covariantContexts block = 
+covariantContexts block =
     let f = \contexts => flattenVariables (MkVariables (blockCovariantInputs block) :: contexts)
      in vectToList1 $ map f (initVect (initsVect (map (MkVariables . covariantOutputs) (DPair.snd $ list1ToVect $ blockLines block))))
 
 ||| extract all the contravariant variables from each line inside the block
 contravariantContexts : Block p e -> List1 (Variables p)
-contravariantContexts block = 
+contravariantContexts block =
     vectToList1 $ map (f . reverse) (tail (tailsVect (map (MkVariables . contravariantOutputs) (DPair.snd $ list1ToVect $ blockLines block))))
     where f : List (Variables p) -> Variables p
-          f contexts = flattenVariables (concat {t=List} 
+          f contexts = flattenVariables (concat {t=List}
                                                    [ pure (MkVariables (blockCovariantInputs block))
                                                    , map (MkVariables . covariantOutputs) (forget $ blockLines block)
                                                    , pure (MkVariables (blockContravariantInputs block))
@@ -84,9 +84,9 @@ linesWithContext block = zipWith3 MkLineCtx (blockLines block) (covariantContext
 ||| Compile a block into a FreeOpenGame, ready for code generation
 export
 compileBlock : Block p e -> FreeOpenGame p e
-compileBlock block = 
+compileBlock block =
     let lines = the (List1 (LineWithContext p e)) (linesWithContext block)
-        covariantBlockContext = flattenVariables 
+        covariantBlockContext = flattenVariables
           [ covariantContext (last lines) , MkVariables (covariantOutputs (line (last lines)))]
         contravariantBlockContext = flattenVariables [contravariantContext (head lines)
                                                      , MkVariables (contravariantOutputs (line (head lines)))]
@@ -106,4 +106,4 @@ parseLambdaAsOpenGame = map (compileBlock . convertGame) . parseVerbose
 ||| Useful for debugging
 export
 parseAndPrintGame : String -> String
-parseAndPrintGame =  either (id) (show) . parseVerbose 
+parseAndPrintGame =  either (id) (show) . parseVerbose
