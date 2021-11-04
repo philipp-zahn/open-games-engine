@@ -19,10 +19,12 @@ data Pat e =
 
   ||| Matching literal
     LitP e
-           -- | TupP (List (Pat e))
-           -- | LitP e
-           -- | ListP (List (Pat e))
-           -- | ConP String (List (Pat e))
+
+export
+Show e => Show (Pat e) where
+  show (VarP n) = show n
+  show (ConP n args) = "\{n} @@ \{show args}"
+  show (LitP e) = "literal:\{show e}"
 
 compileLiteral : Literal -> TTImp
 compileLiteral (LInt i) = IPrimVal EmptyFC (BI i)

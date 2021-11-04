@@ -1,12 +1,12 @@
 ||| The AST that is executed after open games have been compiled
-module Preprocessor.RuntimeAST 
+module Preprocessor.RuntimeAST
 
-import Data.List 
+import Data.List
 
 ||| Variables are just lists of patterns
 public export
 record Variables  p where
-  constructor MkVariables 
+  constructor MkVariables
   vars : List p
 
 export
@@ -15,8 +15,8 @@ Functor Variables where
 
 ||| Expressions are list of expressions
 public export
-record Expressions e where 
-  constructor MkExpressions 
+record Expressions e where
+  constructor MkExpressions
   exps : List e
 
 export
@@ -28,9 +28,9 @@ tuple [x] = x
 tuple xs = "(" ++ fastPack (intercalate (fastUnpack ", ") (map fastUnpack xs)) ++ ")"
 
 export
-implementation Show (Variables String) where show = tuple . vars
+Show e => Show (Variables e) where show = show . vars
 export
-implementation Show (Expressions String) where show = tuple . exps
+Show e => Show (Expressions e) where show = show . exps
 
 
 -- newtype AtomExpression = AtomExpression String
@@ -41,16 +41,15 @@ implementation Show (Expressions String) where show = tuple . exps
 -- Function expressions are Haskell expressions used as inputs to fromLens (from the class OG)
 public export
 data FunctionExpression p e = Identity                                 -- \x -> x
-                            | Copy                                     -- \x -> (x, x)
                             | Lambda (Variables p) (Expressions e)     -- \(x1, ..., xm) -> (e1, ..., en)
                             | CopyLambda (Variables p) (Expressions e) -- \(x1, ..., xm) -> ((x1, ..., xm), (e1, ..., en))
-                            | Multiplex (Variables p) (Variables p)    -- \((x1, ..., xm), (y1, ..., yn)) -> (x1, ..., xm, y1, ..., yn)
+                            | Multiplex (Variables p) (Variables p)
+                            -- \((x1, ..., xm), (y1, ..., yn)) -> (x1, ..., xm, y1, ..., yn)
                             | Curry (FunctionExpression p e)           -- curry f
 
 export
 Functor (FunctionExpression p) where
   map f Identity         = Identity
-  map f Copy             = Copy
   map f (Lambda x y)     = Lambda x (map f y)
   map f (CopyLambda x y) = CopyLambda x (map f y)
   map f (Multiplex x y)  = Multiplex x y
@@ -59,7 +58,6 @@ Functor (FunctionExpression p) where
 export
 implementation Bifunctor FunctionExpression where
   mapFst f Identity = Identity
-  mapFst f Copy = Copy
   mapFst f (Lambda v e) = Lambda (map f v) e
   mapFst f (CopyLambda v e) = CopyLambda (map f v) e
   mapFst f (Multiplex v1 v2) = Multiplex (map f v1) (map f v2)
@@ -71,9 +69,8 @@ flattenVariables : List (Variables p) -> Variables p
 flattenVariables = MkVariables . concat . map vars
 
 export
-implementation Show (FunctionExpression String String) where
+Show a => Show b => Show (FunctionExpression a b) where
   show Identity         = "\\x -> x"
-  show Copy             = "\\x -> (x, x)"
   show (Lambda x e)     = concat ["\\", show x, " -> ", show e]
   show (CopyLambda x e) = concat ["\\", show x, " -> (", show x, ", ", show e, ")"]
   show (Multiplex x y)  = concat ["\\(", show x, ", ", show y, ") -> ", show (flattenVariables [x, y])]
@@ -109,8 +106,8 @@ implementation Bifunctor FreeOpenGame where
   mapSnd = map
 
 export
-implementation Show (FreeOpenGame String String)  where
-  show (Atom e)           = concat ["(",  e, ")"]
+Show a => Show b => Show (FreeOpenGame a b)  where
+  show (Atom e)           = concat ["(",  show e, ")"]
   show (Lens v u)         = concat ["fromLens (", show v, ") (", show u, ")"]
   show (Function f g)     = concat ["fromFunctions (", show f, ") (", show g, ")"]
   show Counit             = "counit"
