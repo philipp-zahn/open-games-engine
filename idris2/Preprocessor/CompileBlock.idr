@@ -82,7 +82,7 @@ linesWithContext : Block p e -> List1 (LineWithContext p e)
 linesWithContext block = zipWith3 MkLineCtx (blockLines block) (covariantContexts block) (contravariantContexts block)
 
 ||| Compile a block into a FreeOpenGame, ready for code generation
-export
+public export
 compileBlock : Block p e -> FreeOpenGame p e
 compileBlock block =
     let lines = the (List1 (LineWithContext p e)) (linesWithContext block)
@@ -97,13 +97,13 @@ compileBlock block =
      in Sequential (Sequential l1 l2) l3
 
 ||| Parses a game and compiels it down to a `FreeOpenGame` ready for code generation
-export
+public export
 parseLambdaAsOpenGame : String -> Either String (FreeOpenGame (Pat TTImp) TTImp)
 parseLambdaAsOpenGame = map (compileBlock . convertGame) . parseVerbose
 
 -- print the parsed AST crash if it does not parse
 ||| parses a game and returns a string representing the AST or, representing and error
 ||| Useful for debugging
-export
+public export
 parseAndPrintGame : String -> String
 parseAndPrintGame =  either (id) (show) . parseVerbose

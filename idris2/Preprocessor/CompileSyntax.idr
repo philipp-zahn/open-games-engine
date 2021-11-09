@@ -23,8 +23,8 @@ data Pat e =
 export
 Show e => Show (Pat e) where
   show (VarP n) = show n
-  show (ConP n args) = "\{n} @@ \{show args}"
-  show (LitP e) = "literal:\{show e}"
+  show (ConP n args) = "\{n} @@ \{assert_total $ show args}"
+  show (LitP e) = "literal:\{assert_total $ show e}"
 
 compileLiteral : Literal -> TTImp
 compileLiteral (LInt i) = IPrimVal EmptyFC (BI i)
@@ -52,23 +52,23 @@ mutual
   compileLambda (Lam pat body) =
     case compilePattern pat of
          (VarP name) => ILam EmptyFC MW ExplicitArg (Just name) (Implicit EmptyFC False) (compileLambda body)
-         _ => ?unsupportedMatching
+         _ => `(id)
          -- Right clause => ?unsupprtedMatching-- ILam EmptyFC MW ExplicitArg (Just (MN "caseArg" 0)) (Implicit EmptyFC False)
          --                 --     (ICase EmptyFC (IVar EmptyFC (MN "caseArg" 0)) (compileLambda body) [clause])
   compileLambda (LList []) = `(Nil)
   compileLambda (LList (x :: xs)) = IApp EmptyFC (IApp EmptyFC `((::)) (compileLambda x)) (compileLambda (LList xs))
   -- compileLambda (LList ls) = let v = map compileLambda ls in `(ls)
-  compileLambda (Do sm) = ?seeyalater
+  compileLambda (Do sm) = `(id)
   compileLambda (Tuple f s []) = `(MkPair) @@ compileLambda f @@ compileLambda s
   compileLambda (Tuple f s (x :: xs)) = `(MkPair) @@ compileLambda f @@ compileLambda (Tuple s x xs)
-  compileLambda (Range _) = ?impRangej
+  compileLambda (Range _) = `(id)
   compileLambda (IfThenElse c t e) = `(ifThenElse) @@ compileLambda c @@ compileLambda t @@ compileLambda e
   compileLambda (IFixOp name arg1 arg2) = IVar EmptyFC (UN (Basic name)) @@ compileLambda arg1 @@ compileLambda arg2
   compileLambda (PFixOp name arg) = IVar EmptyFC (UN (Basic name)) @@ compileLambda arg
   compileLambda (LLet name val body) =
     case compilePattern name of
          (VarP name) => ILet EmptyFC EmptyFC MW name (Implicit EmptyFC True) (compileLambda val) (compileLambda body)
-         _ => ?unsupportedMatchingLet
+         _ => `(id)
          -- Right clause => ?unsupportedMatchingLet-- ICase EmptyFC (compileLambda val) (compileLambda body) [clause]
   compileLambda (Unbound name) = IHole EmptyFC name
 
@@ -93,7 +93,7 @@ compLine (MkLine covOut conIn op conOut covIn) =
 
 
 -- Converts from the in-house AST to the template haskell AST
-export
+public export
 convertGame : Block Pattern Lambda -> Block (Pat TTImp) TTImp
 convertGame (MkBlock covIn conOut lns covOut conIn) =
   MkBlock (map compilePattern covIn)

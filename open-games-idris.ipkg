@@ -32,7 +32,7 @@ main = Tests.Main
 executable = "OG-idris"
 
 -- options
-opts = "--directive extraRuntime=idris2/FFI/support.ss"
+opts = "--directive extraRuntime=idris2/FFI/support.ss --eval scheme"
 
 sourcedir = "idris2"
 

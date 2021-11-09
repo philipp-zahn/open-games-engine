@@ -2,13 +2,16 @@
 module Preprocessor.Parser
 
 import public Preprocessor.BlockSyntax
-import Data.String.Parser
-import Data.String.Parser.Expression
+import Preprocessor.ParserExpr
+import Preprocessor.ParserLib as P
 import public Data.List1
 import Generics.Derive
 import Debug.Trace
 
-%language ElabReflection
+
+tuple : List String -> String
+tuple [x] = x
+tuple xs = "(" ++ pack (intercalate (unpack ", ") (map unpack xs)) ++ ")"
 
 Num a => Show a => Interpolation a where
   interpolate = show
@@ -19,7 +22,7 @@ data Literal
   | LBool Bool
   | LString String
 
-export
+public export
 Show Literal where
   show (LInt x) = show x
   show (LBool x) = show x
@@ -33,7 +36,13 @@ data Pattern
   | PList (List Pattern)     -- List pattern
   | PLit Literal             -- Match a literal exactly
 
-%runElab derive "Pattern" [Generic, Meta, Show]
+export
+Show Pattern where
+  show (PVar x) = "%\{x}"
+  show (PTuple xs) = tuple (map (assert_total show) xs)
+  show (PCon nm args) = #"\{assert_total $ show nm} \{concat $ intersperse " " $ assert_total (map show args)}"#
+  show (PList xs) = #"[\{concat $ intersperse ", " $ assert_total (map show xs)}]"#
+  show (PLit lit) = show lit
 
 mutual
   public export
@@ -52,7 +61,24 @@ mutual
     | LLet Pattern Lambda Lambda
     | Unbound String
 
-  %runElab derive "Lambda" [Generic, Meta, Show]
+  -- %runElab derive "Lambda" [Generic, Meta]
+
+  export
+  Show Lambda where
+    show (Var x) = "$\{x}"
+    show (App x y) = "\{assert_total $ show x} \{assert_total $ show y}"
+    show (Lam x y) = "λ\{assert_total $ show x}. \{assert_total $ show y}"
+    show (Lit x) = assert_total $ show x
+    show (LList xs) = assert_total $ show xs
+    show (Do xs) = "do " ++ unlines (assert_total (map (\case (Nothing, term) => show term
+                                                              (Just var, term) => "\{show var} <- \{show term}") xs))
+    show (Tuple x y xs) = tuple (show x :: show y :: assert_total (map show xs))
+    show (Range x) = show x
+    show (IfThenElse x y z) = "if \{assert_total $ show x} then \{assert_total $ show y} else \{assert_total $ show z}"
+    show (IFixOp x y z) = "\{assert_total $ show y} \{x} \{assert_total $ show z}"
+    show (PFixOp x y) = "\{x} \{assert_total $ show y}"
+    show (LLet x y z) = "let \{assert_total $ show x} = \{assert_total $ show y} in \{assert_total $ show z}"
+    show (Unbound x) = "?" ++ x
 
   public export
   data LRange =
@@ -61,11 +87,12 @@ mutual
               | LFromToR Lambda Lambda
               | LFromThenToR Lambda Lambda Lambda
 
+  public export
   Show LRange where
-    show (LFromR x) = "[ \{show x} ..]"
-    show (LFromThenR x y) = "[ \{show x}, \{show y} .. ]"
-    show (LFromToR x y) = "[ \{show x} .. \{show y}]"
-    show (LFromThenToR x y z) = "[ \{show x},{show y} .. \{show z}]"
+    show (LFromR x) = "[ \{(assert_total (show x))} ..]"
+    show (LFromThenR x y) = "[ \{(assert_total (show x))}, \{(assert_total (show y))} .. ]"
+    show (LFromToR x y) = "[ \{(assert_total (show x))} .. \{(assert_total (show y))}]"
+    show (LFromThenToR x y z) = "[ \{assert_total $ show x},{assert_total $ show y} .. \{assert_total $ show z}]"
 
 
 
@@ -76,102 +103,87 @@ languageKeywords = ["if", "then", "else", "data", "import", "do", "let", "in"
                    , "operation"
                    ]
 
--- modifiedHaskell : LanguageDef st
--- modifiedHaskell = emptyDef
---                 { Tok.commentStart   = "{-"
---                 , Tok.commentEnd     = "-}"
---                 , Tok.commentLine    = "//"
---                 , Tok.nestedComments = True
---                 , Tok.identStart     = letter
---                 , Tok.identLetter    = alphaNum <|> oneOf "_'"
---                 , Tok.opStart        = Tok.opLetter modifiedHaskell
---                 , Tok.opLetter       = oneOf ":!#$%&*+./<=>?@\\^-~"
---                 , Tok.reservedOpStrings= ["::","..","=","\\","|","<-","->","@","~","=>", "$", "-<", ";", "|", "<<=", "||", "=>>", "_"]
---                 , Tok.reservedStrings  = languageKeywords
---                 , Tok.caseSensitive  = True
---                 }
-many1 : Parser a -> Parser (List1 a)
-many1 p = [| p ::: many p |]
 
-logMsg : {default 10 leading : Nat} -> String -> Parser ()
-logMsg msg = P $ \s => trace "\{s.pos} - \{s.pos + cast leading} : \{show $ take leading s.input} : \{msg}"
-    $ pure (OK () s)
+logMsg : {default 10 leading : Nat} -> String -> Parser MayNotConsume ()
+logMsg msg = P $ \s => trace "\{s.pos} - \{s.pos + cast leading} : \{show $ take leading s.input.next} : \{msg}"
+    $ (OK () s)
 
-logStatus : {default 10 leading : Nat} -> Parser ()
-logStatus = P $ \s => trace "Log as position \{s.pos}, next \{leading} character: \{take leading s.input}" $ pure (OK () s)
+logStatus : {default 10 leading : Nat} -> Parser MayNotConsume ()
+logStatus = P $ \s => trace "Log as position \{s.pos}, next \{leading} character: \{pack $ take leading s.input.next}" $ (OK () s)
 
 
-traceP : Monad m => ParseT m a -> ParseT m a
-traceP (P st) = trace "tracing parser" $ P $ \(S inp max pos) =>
-                let () = trace "position before : \{pos}" () in
-                do res <- st (S inp max pos)
-                   let () = case the (Result a) res of
-                        OK v st => the Unit (trace "parse succeeeded, consumed : \{take (cast (st.pos - pos))inp}" ())
-                        Fail newPos msg => trace "parse failed with error \{show msg}, new position is : \{newPos}" ()
-                   pure res
-
-try : Functor m => ParseT m a -> ParseT m a
-try (P runParser) =
-    P $ \st => rollbackPos st <$> runParser st
-    where
-        rollbackPos : State -> Result a -> Result a
-        rollbackPos s (Fail a b ) = Fail s.pos b
-        rollbackPos s (OK a b)   = OK a b
+-- -- traceP : Monad m => Parser a -> Parser a
+-- -- traceP (P st) = trace "tracing parser" $ P $ \(S inp max pos) =>
+-- --                 let () = trace "position before : \{pos}" () in
+-- --                     res <- st (S inp max pos)
+-- --                     () = case the (Result a) res of
+-- --                         OK v st => the Unit (trace "parse succeeeded, consumed : \{take (cast (st.pos - pos))inp}" ())
+-- --                         Fail newPos msg => trace "parse failed with error \{show msg}, new position is : \{newPos}" ()
+-- --                  in res
+--
+-- -- try : Parser a -> Parser a
+-- -- try (P runParser) =
+-- --     P $ \st => rollbackPos st $ runParser st
+-- --     where
+-- --         rollbackPos : State -> Result a -> Result a
+-- --         rollbackPos s (Fail a b ) = Fail s.pos b
+-- --         rollbackPos s (OK a b)   = OK a b
 
 mutual
-  sepEndBy1 : Parser a -> Parser sep -> Parser (List a)
+  sepEndBy1 : Parser Consumes a -> Parser Consumes sep -> Parser Consumes (List1 a)
   sepEndBy1 p sep     = do{ x <- p
-                          ; do{ ignore sep
-                              ; xs <- sepEndBy p sep
-                              ; pure (x::xs)
-                              } <|> pure [x]
+                          ; xs <- (sep *> sepEndBy p sep) <|> pure []
+                          ; pure (x ::: xs)
                           }
 
 
-  sepEndBy :  Parser a -> Parser sep -> Parser (List a)
-  sepEndBy p sep = sepEndBy1 p sep <|> pure []
+  sepEndBy : Parser Consumes a -> Parser Consumes sep -> Parser MayNotConsume (List a)
+  sepEndBy p sep = (forget <$> sepEndBy1 p sep) <|> pure []
 
-colon : Parser ()
+colon : Parser Consumes ()
 colon = token ":"
 
-semi : Parser ()
+semi : Parser Consumes ()
 semi = token ";"
 
-choice : List (Parser a) -> Parser a
-choice = foldr (\x, y => x <|> y) empty
+choice : List (Parser Consumes a) -> Parser MayNotConsume a
+choice [] = P.empty
+choice (x :: xs) = x <|> choice xs
 
-oneOf : String -> Parser Char
-oneOf xs = foldr (\x, y => x <|> y) (fail "none of \{show xs}") (map (char) (unpack xs))
+public export
+oneOf : (str : List Char) -> NonEmpty str => Parser Consumes Char
+oneOf xs = foldr (\x, y => x <|> y) (fail "none of \{show xs}") (map char xs)
 
-reserved : String -> Parser ()
+reserved : (str : String) -> NonEmpty str => Parser Consumes ()
 reserved = token -- lexeme (string name *> pure ()) -- *> requireFailure alphaNum)
 
-reservedOp : String -> Parser ()
-reservedOp op = lexeme (string op *> requireFailure (oneOf ":!#$%&*+./<=>?@\\^-~"))
+reservedOp : (str : String) -> NonEmpty str => Parser Consumes ()
+reservedOp op = lexeme (string op *> P.requireFailure (oneOf (unpack ":!#$%&*+./<=>?@\\^-~")))
 
-identifier : Parser String
-identifier = pack <$> some (alphaNum <|> oneOf "_'") <* spaces
+identifier : Parser Consumes String
+identifier = pack <$> (Prelude.(::) <$> letter <*> many (alphaNum <|> oneOf (unpack "_'"))) <* spaces
 
-surround : Parser a -> Parser b -> Parser c -> Parser c
+surround : Parser Consumes a -> Parser Consumes b -> Parser c' c -> Parser Consumes c
 surround l r m = l *> m <* r
 
-brackets : Parser a -> Parser a
+brackets : Parser c a -> Parser Consumes a
 brackets = surround (char '[') (char ']')
 
-braces : Parser a -> Parser a
+braces : Parser c a -> Parser Consumes a
 braces = surround (char '{') (char '}')
 
-comma : Parser ()
+comma : Parser Consumes ()
 comma = token ","
 
-contents : Parser a -> Parser a
+contents : Parser Consumes a -> Parser Consumes a
 contents p = spaces *> p <* eos
 
-mkInfix : String -> Parser (Lambda -> Lambda -> Lambda)
-mkInfix op = reservedOp op >> pure (IFixOp op)
+mkInfix : (str : String) -> NonEmpty str => Parser Consumes (Lambda -> Lambda -> Lambda)
+mkInfix op = reservedOp op `seqRight` pure (IFixOp op)
 
 -- stirng literals do not escape for now
-stringLiteral : Parser String
+public export
+stringLiteral : Parser Consumes String
 stringLiteral   = lexeme (
                   do{ str <- surround (char '"')
                                       (char '"' <?> "end of string")
@@ -180,14 +192,15 @@ stringLiteral   = lexeme (
                     }
                   <?> "literal string")
     where
-      stringLetter : Parser Char
+      stringLetter : Parser Consumes Char
       stringLetter = satisfy (\c => (c /= '"') && (c /= '\\') && (c > '\026'))
 
-      stringChar : Parser (Maybe Char)
+      stringChar : Parser Consumes (Maybe Char)
       stringChar = (Just <$> stringLetter)
                       -- <|> stringEscape
                       <?> "string character"
 
+public export
 operators : OperatorTable Lambda
 operators = [ [Infix (mkInfix "$") AssocRight]
             , [Infix (mkInfix ">>=") AssocLeft]
@@ -210,101 +223,115 @@ operators = [ [Infix (mkInfix "$") AssocRight]
             ]
 
 -- infix parser needs a parser to parse expressiosn around the operators
-infixParser : Parser Lambda -> Parser Lambda
+public export
+infixParser : Parser Consumes Lambda -> Parser Consumes Lambda
 infixParser lambda = buildExpressionParser Lambda operators lambda
 
 
 -- ^ Parse a variable as a Lambda term
-variable : Parser Lambda
+public export
+variable : Parser Consumes Lambda
 variable = Var <$> identifier
 
 -- ^ Parse an Integer as a Lambda term
-number : Parser Lambda
+number : Parser Consumes Lambda
 number = (pure $ Lit (LInt (cast !natural))) <?> "natural"
 
 -- ^ Parse a string literal as a Lambda term
-strLit : Parser Lambda
+strLit : Parser Consumes Lambda
 strLit = Lit . LString <$> stringLiteral
 
 -- ^ Parse two things in sequence and bundle them in a pair
-pair : Parser a -> Parser b -> Parser (a, b)
-pair p1 p2 = do r1 <- p1; r2 <- p2; pure (r1, r2)
+pair : Parser c1 a -> Parser c2 b -> Parser (c1 || c2) (a, b)
+pair p1 p2 = let v =  do r1 <- p1
+                         r2 <- p2
+                         pure (r1, r2)
+              in rewrite sym $ orRightId c2 in v
 
-parseLit : Parser Literal
+parseLit : Parser Consumes Literal
 parseLit = LString <$> stringLiteral
        <|> LInt . cast <$> natural
 
-parseUnbound : Parser Lambda
+parseUnbound : Parser Consumes Lambda
 parseUnbound = reservedOp "_" *> pure (Unbound "")
 
 isConstructor : String -> Bool
-isConstructor str = case fastUnpack str of
+isConstructor str = case unpack str of
                          (x :: xs) => isUpper x
                          _ => False
 
-parsePattern : Parser Pattern
+public export
+parsePattern : Parser Consumes Pattern
 parsePattern =
-  (do p <- identifier ;
-      logMsg "found pattern identitfier : \{show p}"
+  (identifier >>= (\p =>
+      -- logMsg "found pattern identitfier : \{show p}"
       if isConstructor p then PCon p <$> many parsePattern
-                         else pure $ PVar p)
+                         else pure $ PVar p))
   <|> PTuple <$> parens (commaSep parsePattern)
   <|> PList <$> brackets (commaSep parsePattern)
   <|> PLit <$> parseLit
 
+public export
+reduce : (a -> a -> a) -> List1 a -> a
+reduce f (x ::: []) = x
+reduce f (x ::: (y :: xs)) = f y (reduce f (x ::: xs))
+
 mutual
-  doNotation : Parser Lambda
+  public export
+  doNotation : Parser Consumes Lambda
   doNotation =
     Do <$> (reserved "do"
         *> braces (statement `sepEndBy` reservedOp ";"))
     where
-      statement : Parser (Maybe String, Lambda)
+      statement : Parser Consumes (Maybe String, Lambda)
       statement = ((Just <$> identifier <* reservedOp "<-") `pair` expr)
               <|> ((the (Maybe String) Nothing ,) <$> expr)
 
-  parseLet : Parser Lambda
+  parseLet : Parser Consumes Lambda
   parseLet = do
-    reserved "let"
+    _ <- reserved "let"
     varString <- parsePattern
-    reservedOp "="
+    _ <- reservedOp "="
     value <- expr
-    reserved "in"
+    _ <- reserved "in"
     body <- expr
     pure (LLet varString value body)
 
-  parseTuple : Parser Lambda
+  parseTuple : Parser Consumes Lambda
   parseTuple = do
     f <- expr
-    ignore comma
+    _ <- comma
     s <- expr
     rest <- many (comma *> expr)
     pure (Tuple f s rest)
 
-  lambda : Parser Lambda
+  public export
+  lambda : Parser Consumes Lambda
   lambda = do
-    reservedOp "\\"
+    _ <- reservedOp "λ"
     args <- some parsePattern
-    reservedOp "->"
+    _ <- reservedOp "->"
     body <- expr
     pure $ foldr Lam body args
 
-  ifExp : Parser Lambda
+  ifExp : Parser Consumes Lambda
   ifExp = do
-    ignore $ reserved "if"
+    _ <- reserved "if"
     prd <- term
-    ignore $ reserved "then"
+    _ <- reserved "then"
     thn <- term
-    ignore $ reserved "else"
+    _ <- reserved "else"
     els <- term
     pure $ IfThenElse prd thn els
 
+  public export
   ||| Parse a bracketed expression
   ||| Those are a bit complicated because they can be either a list
   ||| Or a range with begining and end
   ||| Or an infinite list
   ||| Or a range with begining and end and a step size
   ||| Or an infinite list with a step size
-  bracketed : Parser Lambda
+  bracketed : Parser MayNotConsume Lambda
   bracketed =
     (do { e1 <- expr -- first check we have at least one element
         ; do { e2 <- comma *> expr -- then expect a comma
@@ -320,7 +347,8 @@ mutual
         })
     <|> pure (LList [])
 
-  term : Parser Lambda
+  public export
+  term : Parser Consumes Lambda
   term =  parens (parseTuple <|> expr)
       <|> ifExp
       <|> lambda
@@ -331,51 +359,57 @@ mutual
       <|> doNotation
       <|> parseLet
       <|> parseUnbound
-  appl : Parser Lambda
+
+  public export
+  appl : Parser Consumes Lambda
   appl = do
-    es <- many1 term
-    pure (foldl1 App es)
+    es <- some term
+    pure (Parser.reduce App es)
 
-  expr : Parser Lambda
-  expr = infixParser appl <* spaces
+  public export
+  expr : Parser Consumes Lambda
+  expr = appl <* spaces
 
-parseTwoLines : String -> String -> Parser p -> Parser e -> Parser (List p, List e)
+public export
+parseTwoLines : (kw1, kw2 : String) -> NonEmpty kw1 => NonEmpty kw2 =>
+                Parser Consumes p -> Parser Consumes e -> Parser Consumes (List p, List e)
 parseTwoLines kw1 kw2 parseP parseE =
     pair (reserved kw1 *> colon *> commaSep parseP <* semi )
          (option [] (reserved kw2 *> colon *> commaSep parseE <* semi ))
      <|> (([], ) <$> (reserved kw2 *> colon *> commaSep parseE <* semi))
 
-parseInput : Parser p -> Parser e -> Parser (List p, List e)
-parseInput p1 p2 = logMsg "parsing input" *>  parseTwoLines "inputs" "feedback" p1 p2
+public export
+parseInput : Parser Consumes p -> Parser Consumes e -> Parser Consumes (List p, List e)
+parseInput p1 p2 =  parseTwoLines "inputs" "feedback" p1 p2
 
-parseOutput : Parser p -> Parser e -> Parser (List p, List e)
-parseOutput p1 p2 = logMsg "parsing output" *> parseTwoLines "outputs" "returns" p1 p2
+public export
+parseOutput : Parser Consumes p -> Parser Consumes e -> Parser Consumes (List p, List e)
+parseOutput p1 p2 = parseTwoLines "outputs" "returns" p1 p2
 
-parseDelimiter : Parser (List String)
+public export
+parseDelimiter : Parser Consumes (List1 String)
 parseDelimiter = colon *> some (string "-") <* colon
 
-parseVerboseLine : Show p => Show e => Parser p -> Parser e -> Parser (Line p e)
+public export
+parseVerboseLine : Show p => Show e => Parser Consumes p -> Parser Consumes e -> Parser Consumes (Line p e)
 parseVerboseLine parseP parseE = do
   (covIn, conOut) <- option ([], []) (parseInput parseE parseP)
   program <- reserved "operation" *> colon *> parseE <* semi
   (covOut,conIn) <- option ([], []) (parseOutput parseP parseE)
   pure $ MkLine covIn conOut program covOut conIn
 
-parseVerboseSyntax : Show p => Show e => Parser p -> Parser e -> Parser (Block p e)
+public export
+parseVerboseSyntax : Show p => Show e => Parser Consumes p -> Parser Consumes e -> Parser Consumes (Block p e)
 parseVerboseSyntax parseP parseE =
   do (covIn, conOut) <- (parseInput parseP parseE <* parseDelimiter)
-     lines <- many1 (parseVerboseLine parseP parseE)
+     lines <- some (parseVerboseLine parseP parseE)
      (covOut,conIn) <- (parseDelimiter *> parseOutput parseE parseP)
      pure $ MkBlock covIn conOut lines covOut conIn
 
-parseAll : Parser a -> String -> Either String a
-parseAll p input = case parse p input of
-                        Left fail => Left fail
-                        Right (v, pos) => if pos < cast (length input)
-                                             then Left "only consumed \{take (cast pos) input}"
-                                             else Right v
+public export
+check : ParserLib.parse Parser.lambda "λx -> x" === Right {a=String} (Lam (PVar "x") (Var "x"))
+check = Refl
 
-
-export
+public export
 parseVerbose : String -> Either String (Block Pattern Lambda)
-parseVerbose = parseAll (logStatus *> parseVerboseSyntax parsePattern expr)
+parseVerbose = parseAll (parseVerboseSyntax parsePattern expr)

@@ -72,6 +72,7 @@ interpretFunction (CopyLambda (MkVariables { vars }) (MkExpressions { exps })) =
 interpretFunction (Multiplex (MkVariables { vars }) (MkVariables { vars = vars' })) =
   interpretLambda [nestedApply PairP (ConP "MkUnit" []) vars, nestedApply PairP (ConP "MkUnit" []) vars'] (map patClauseLHS vars ++ map patClauseLHS vars')
 
+public export
 interpretOpenGame : FreeOpenGame (Pat TTImp) TTImp -> TTImp
 interpretOpenGame (Atom n) = n
 interpretOpenGame (Lens f1 f2) = `(fromLens) @@ interpretFunction f1 @@ interpretFunction f2
