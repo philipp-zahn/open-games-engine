@@ -28,7 +28,7 @@ import public Data.List1
 
 public export
 record Line (p, e : Type) where
-  constructor MkLine 
+  constructor MkLine
   covariantInputs      : List e
   contravariantOutputs : List p
   matrix               : e
@@ -76,8 +76,8 @@ implementation Traversable (Line p) where
 
 public export
 record Block (p, e : Type) where
-  constructor MkBlock 
-  blockCovariantInputs : List p 
+  constructor MkBlock
+  blockCovariantInputs : List p
   blockContravariantOutputs : List e
   blockLines : List1 (Line p e)
   blockCovariantOutputs : List e
@@ -95,7 +95,7 @@ implementation Applicative (Block p) where
   pure v = MkBlock [] [] (pure (pure v)) [] []
 
   (MkBlock _ _ f _ _) <*> (MkBlock covIn conOut m covOut conIn) =
-    let v := map (<*>) f 
+    let v := map (<*>) f
         mapLines : List (Line p (a -> b)) -> List a -> List b
         mapLines f as = map extract f <*> as
       in MkBlock covIn

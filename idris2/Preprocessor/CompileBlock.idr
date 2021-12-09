@@ -99,7 +99,7 @@ compileBlock block =
 ||| Parses a game and compiels it down to a `FreeOpenGame` ready for code generation
 public export
 parseLambdaAsOpenGame : String -> Either String (FreeOpenGame (Pat TTImp) TTImp)
-parseLambdaAsOpenGame = map (compileBlock . convertGame) . parseVerbose
+parseLambdaAsOpenGame input = map (compileBlock . convertGame) $ parseVerbose input
 
 -- print the parsed AST crash if it does not parse
 ||| parses a game and returns a string representing the AST or, representing and error

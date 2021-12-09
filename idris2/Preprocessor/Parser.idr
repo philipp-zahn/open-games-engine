@@ -8,11 +8,14 @@ import public Data.List1
 import Generics.Derive
 import Debug.Trace
 
+%language ElabReflection
 
+public export
 tuple : List String -> String
 tuple [x] = x
 tuple xs = "(" ++ pack (intercalate (unpack ", ") (map unpack xs)) ++ ")"
 
+public export
 Num a => Show a => Interpolation a where
   interpolate = show
 
@@ -21,6 +24,8 @@ data Literal
   = LInt Integer
   | LBool Bool
   | LString String
+
+%runElab derive "Literal" [Generic, Meta, Eq, Show]
 
 public export
 Show Literal where
@@ -36,7 +41,16 @@ data Pattern
   | PList (List Pattern)     -- List pattern
   | PLit Literal             -- Match a literal exactly
 
-export
+public export
+Eq Pattern where
+  (PVar s)== (PVar s') = s == s'
+  (PTuple t) == (PTuple t') = assert_total $ t == t'
+  (PCon s p) == (PCon s' p') = s == s' && assert_total (p == p')
+  (PList ps) == (PList ps') = assert_total (ps == ps')
+  (PLit l) == (PLit l') = l == l'
+  _ == _ = False
+
+public export
 Show Pattern where
   show (PVar x) = "%\{x}"
   show (PTuple xs) = tuple (map (assert_total show) xs)
@@ -61,9 +75,24 @@ mutual
     | LLet Pattern Lambda Lambda
     | Unbound String
 
-  -- %runElab derive "Lambda" [Generic, Meta]
+  public export
+  Eq Lambda where
+    (Var s)               == (Var s')      = assert_total $ s == s'
+    (App l1 l2)           == (App l1' l2') = assert_total $ l1 == l1' && l2 == l2'
+    (Lam p1 l1)           == (Lam p1' l1') = assert_total $ p1 == p1' && l1 == l1'
+    (Lit lit)             == (Lit lit')    = assert_total $ lit == lit'
+    (LList ls)            == (LList ls')   = assert_total $ ls == ls'
+    (Do ls)               == (Do ls')      = assert_total $ ls == ls'
+    (Tuple l1 l2 ls)      == (Tuple l1' l2' ls') = assert_total $ l1 == l1' && l2 == l2' && ls == ls'
+    (Range rg)            == (Range rg')              = assert_total $ rg == rg'
+    (IfThenElse l1 l2 l3) == (IfThenElse l1' l2' l3') = assert_total $ l1 == l1' && l2 == l2' && l3 == l3'
+    (IFixOp s l1 l2)      == (IFixOp s' l1' l2')      = assert_total $ s == s' && l1 == l1' && l2 == l2'
+    (PFixOp s l1)         == (PFixOp s' l1')          = assert_total $ s == s' && l1 == l1'
+    (LLet p l1 l2)        == (LLet p' l1' l2')        = assert_total $ p == p' && l1 == l1' && l2 == l2'
+    (Unbound s)           == (Unbound s')             = assert_total $ s == s'
+    _ == _ = False
 
-  export
+  public export
   Show Lambda where
     show (Var x) = "$\{x}"
     show (App x y) = "\{assert_total $ show x} \{assert_total $ show y}"
@@ -88,6 +117,14 @@ mutual
               | LFromThenToR Lambda Lambda Lambda
 
   public export
+  Eq LRange where
+    (LFromR l1)             == (LFromR l1')               = assert_total $ l1 == l1'
+    (LFromThenR l1 l2)      == (LFromThenR l1' l2')       = assert_total $ l1 == l1' && l2 == l2'
+    (LFromToR l1 l2)        == (LFromToR l1' l2')         = assert_total $ l1 == l1' && l2 == l2'
+    (LFromThenToR l1 l2 l3) == (LFromThenToR l1' l2' l3') = assert_total $ l1 == l1' && l2 == l2' && l3 == l3'
+    _ == _ = False
+
+  public export
   Show LRange where
     show (LFromR x) = "[ \{(assert_total (show x))} ..]"
     show (LFromThenR x y) = "[ \{(assert_total (show x))}, \{(assert_total (show y))} .. ]"
@@ -96,6 +133,7 @@ mutual
 
 
 
+public export
 languageKeywords : List String
 languageKeywords = ["if", "then", "else", "data", "import", "do", "let", "in"
                    , "inputs", "outputs"
@@ -104,10 +142,12 @@ languageKeywords = ["if", "then", "else", "data", "import", "do", "let", "in"
                    ]
 
 
+public export
 logMsg : {default 10 leading : Nat} -> String -> Parser MayNotConsume ()
 logMsg msg = P $ \s => trace "\{s.pos} - \{s.pos + cast leading} : \{show $ take leading s.input.next} : \{msg}"
     $ (OK () s)
 
+public export
 logStatus : {default 10 leading : Nat} -> Parser MayNotConsume ()
 logStatus = P $ \s => trace "Log as position \{s.pos}, next \{leading} character: \{pack $ take leading s.input.next}" $ (OK () s)
 
@@ -130,6 +170,7 @@ logStatus = P $ \s => trace "Log as position \{s.pos}, next \{leading} character
 -- --         rollbackPos s (OK a b)   = OK a b
 
 mutual
+  public export
   sepEndBy1 : Parser Consumes a -> Parser Consumes sep -> Parser Consumes (List1 a)
   sepEndBy1 p sep     = do{ x <- p
                           ; xs <- (sep *> sepEndBy p sep) <|> pure []
@@ -137,15 +178,19 @@ mutual
                           }
 
 
+  public export
   sepEndBy : Parser Consumes a -> Parser Consumes sep -> Parser MayNotConsume (List a)
   sepEndBy p sep = (forget <$> sepEndBy1 p sep) <|> pure []
 
+public export
 colon : Parser Consumes ()
 colon = token ":"
 
+public export
 semi : Parser Consumes ()
 semi = token ";"
 
+public export
 choice : List (Parser Consumes a) -> Parser MayNotConsume a
 choice [] = P.empty
 choice (x :: xs) = x <|> choice xs
@@ -154,30 +199,39 @@ public export
 oneOf : (str : List Char) -> NonEmpty str => Parser Consumes Char
 oneOf xs = foldr (\x, y => x <|> y) (fail "none of \{show xs}") (map char xs)
 
+public export
 reserved : (str : String) -> NonEmpty str => Parser Consumes ()
 reserved = token -- lexeme (string name *> pure ()) -- *> requireFailure alphaNum)
 
+public export
 reservedOp : (str : String) -> NonEmpty str => Parser Consumes ()
 reservedOp op = lexeme (string op *> P.requireFailure (oneOf (unpack ":!#$%&*+./<=>?@\\^-~")))
 
+public export
 identifier : Parser Consumes String
 identifier = pack <$> (Prelude.(::) <$> letter <*> many (alphaNum <|> oneOf (unpack "_'"))) <* spaces
 
+public export
 surround : Parser Consumes a -> Parser Consumes b -> Parser c' c -> Parser Consumes c
 surround l r m = l *> m <* r
 
+public export
 brackets : Parser c a -> Parser Consumes a
 brackets = surround (char '[') (char ']')
 
+public export
 braces : Parser c a -> Parser Consumes a
 braces = surround (char '{') (char '}')
 
+public export
 comma : Parser Consumes ()
 comma = token ","
 
+public export
 contents : Parser Consumes a -> Parser Consumes a
 contents p = spaces *> p <* eos
 
+public export
 mkInfix : (str : String) -> NonEmpty str => Parser Consumes (Lambda -> Lambda -> Lambda)
 mkInfix op = reservedOp op `seqRight` pure (IFixOp op)
 
@@ -234,27 +288,33 @@ variable : Parser Consumes Lambda
 variable = Var <$> identifier
 
 -- ^ Parse an Integer as a Lambda term
+public export
 number : Parser Consumes Lambda
 number = (pure $ Lit (LInt (cast !natural))) <?> "natural"
 
 -- ^ Parse a string literal as a Lambda term
+public export
 strLit : Parser Consumes Lambda
 strLit = Lit . LString <$> stringLiteral
 
 -- ^ Parse two things in sequence and bundle them in a pair
+public export
 pair : Parser c1 a -> Parser c2 b -> Parser (c1 || c2) (a, b)
 pair p1 p2 = let v =  do r1 <- p1
                          r2 <- p2
                          pure (r1, r2)
               in rewrite sym $ orRightId c2 in v
 
+public export
 parseLit : Parser Consumes Literal
 parseLit = LString <$> stringLiteral
        <|> LInt . cast <$> natural
 
+public export
 parseUnbound : Parser Consumes Lambda
 parseUnbound = reservedOp "_" *> pure (Unbound "")
 
+public export
 isConstructor : String -> Bool
 isConstructor str = case unpack str of
                          (x :: xs) => isUpper x
@@ -274,7 +334,7 @@ parsePattern =
 public export
 reduce : (a -> a -> a) -> List1 a -> a
 reduce f (x ::: []) = x
-reduce f (x ::: (y :: xs)) = f y (reduce f (x ::: xs))
+reduce f (x ::: (y :: xs)) = f x (reduce f (y ::: xs))
 
 mutual
   public export
@@ -287,6 +347,7 @@ mutual
       statement = ((Just <$> identifier <* reservedOp "<-") `pair` expr)
               <|> ((the (Maybe String) Nothing ,) <$> expr)
 
+  public export
   parseLet : Parser Consumes Lambda
   parseLet = do
     _ <- reserved "let"
@@ -297,6 +358,7 @@ mutual
     body <- expr
     pure (LLet varString value body)
 
+  public export
   parseTuple : Parser Consumes Lambda
   parseTuple = do
     f <- expr
@@ -314,6 +376,7 @@ mutual
     body <- expr
     pure $ foldr Lam body args
 
+  public export
   ifExp : Parser Consumes Lambda
   ifExp = do
     _ <- reserved "if"

@@ -25,7 +25,7 @@ Functor Expressions where
 
 tuple : List String -> String
 tuple [x] = x
-tuple xs = "(" ++ fastPack (intercalate (fastUnpack ", ") (map fastUnpack xs)) ++ ")"
+tuple xs = "(" ++ fastPack (intercalate (unpack ", ") (map unpack xs)) ++ ")"
 
 export
 Show e => Show (Variables e) where show = show . vars
