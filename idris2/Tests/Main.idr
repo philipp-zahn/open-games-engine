@@ -65,28 +65,29 @@ Show TTImp where
 -- jtestParse : CompileBlock.parseLambdaAsOpenGame  Main.atomicGameInput === Right {a=String} (Atom `(id))
 -- jtestParse = Refl
 
-testParseVerbose : parseVerbose Main.atomicGameInput === Right {a=String}
-  (MkBlock
-  [PVar "x"]
-  []
-  (pure $ MkLine [Var "x"]
-                 []
-                 (App (App (Var "dependentDecision") (Var "playerName")) (Lam (PVar "y") (Var "actionSpace")))
-                 [PVar "y"]
-                 [App (App (App (Var "payoffFunction") (Var "y")) (Var "x")) (Var "r")])
-
-  [Var "y"]
-  [PVar "r"])
-
-testParseVerbose = Refl
+-- testParseVerbose : parseVerbose Main.atomicGameInput === Right {a=String}
+--   (MkBlock
+--   [PVar "x"]
+--   []
+--   (pure $ MkLine [Var "x"]
+--                  []
+--                  (App (App (Var "dependentDecision") (Var "playerName")) (Lam (PVar "y") (Var "actionSpace")))
+--                  [PVar "y"]
+--                  [App (App (App (Var "payoffFunction") (Var "y")) (Var "x")) (Var "r")])
+--
+--   [Var "y"]
+--   [PVar "r"])
+--
+-- testParseVerbose = Refl
 
 testSame : Eq a => Show a => String -> (given, expected : a) -> IO ()
-testSame desc v1 v2 = if v1 == v2 then printLn (colored Green "\{desc} : OK")
-                                  else printLn (colored Red "\{desc} : FAIL")
-                                    *> printLn (colored Yellow "Expected:")
-                                    *> printLn v2
-                                    *> printLn (colored Yellow "Got Instead:")
-                                    *> printLn v1
+testSame desc given expected
+  = if given == expected then printLn (colored Green "\{desc} : OK")
+                         else printLn (colored Red "\{desc} : FAIL")
+                           *> printLn (colored Yellow "Expected:")
+                           *> printLn expected
+                           *> printLn (colored Yellow "Got Instead:")
+                           *> printLn given
 
 
 

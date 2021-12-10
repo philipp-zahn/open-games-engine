@@ -42,21 +42,21 @@ data Pattern
   | PLit Literal             -- Match a literal exactly
 
 public export
-Eq Pattern where
-  (PVar s)== (PVar s') = s == s'
-  (PTuple t) == (PTuple t') = assert_total $ t == t'
-  (PCon s p) == (PCon s' p') = s == s' && assert_total (p == p')
-  (PList ps) == (PList ps') = assert_total (ps == ps')
-  (PLit l) == (PLit l') = l == l'
-  _ == _ = False
-
-public export
 Show Pattern where
   show (PVar x) = "%\{x}"
   show (PTuple xs) = tuple (map (assert_total show) xs)
   show (PCon nm args) = #"\{assert_total $ show nm} \{concat $ intersperse " " $ assert_total (map show args)}"#
   show (PList xs) = #"[\{concat $ intersperse ", " $ assert_total (map show xs)}]"#
   show (PLit lit) = show lit
+
+public export
+Eq Pattern where
+  (PVar s)== (PVar s') = s == s'
+  (PTuple t) == (PTuple t') = assert_total $ t == t'
+  (PCon s p) == (PCon s' p') = s == s' && assert_total (p == p')
+  (PList ps) == (PList ps') = assert_total (ps == ps')
+  (PLit l) == (PLit l') = l == l'
+  p1 == p2 = trace "Pattern false \{show p1} \{show p2}" False
 
 mutual
   public export
@@ -90,13 +90,13 @@ mutual
     (PFixOp s l1)         == (PFixOp s' l1')          = assert_total $ s == s' && l1 == l1'
     (LLet p l1 l2)        == (LLet p' l1' l2')        = assert_total $ p == p' && l1 == l1' && l2 == l2'
     (Unbound s)           == (Unbound s')             = assert_total $ s == s'
-    _ == _ = False
+    p1 == p2 = trace "Lambda false (\{show p1}) (\{show p2})" False
 
   public export
   Show Lambda where
     show (Var x) = "$\{x}"
-    show (App x y) = "\{assert_total $ show x} \{assert_total $ show y}"
-    show (Lam x y) = "λ\{assert_total $ show x}. \{assert_total $ show y}"
+    show (App x y) = "(\{assert_total $ show x} \{assert_total $ show y})"
+    show (Lam x y) = "(λ\{assert_total $ show x} -> \{assert_total $ show y})"
     show (Lit x) = assert_total $ show x
     show (LList xs) = assert_total $ show xs
     show (Do xs) = "do " ++ unlines (assert_total (map (\case (Nothing, term) => show term
@@ -122,7 +122,7 @@ mutual
     (LFromThenR l1 l2)      == (LFromThenR l1' l2')       = assert_total $ l1 == l1' && l2 == l2'
     (LFromToR l1 l2)        == (LFromToR l1' l2')         = assert_total $ l1 == l1' && l2 == l2'
     (LFromThenToR l1 l2 l3) == (LFromThenToR l1' l2' l3') = assert_total $ l1 == l1' && l2 == l2' && l3 == l3'
-    _ == _ = False
+    p1 == p2 = trace "Range false \{show p1} \{show p2}" False
 
   public export
   Show LRange where
@@ -130,8 +130,6 @@ mutual
     show (LFromThenR x y) = "[ \{(assert_total (show x))}, \{(assert_total (show y))} .. ]"
     show (LFromToR x y) = "[ \{(assert_total (show x))} .. \{(assert_total (show y))}]"
     show (LFromThenToR x y z) = "[ \{assert_total $ show x},{assert_total $ show y} .. \{assert_total $ show z}]"
-
-
 
 public export
 languageKeywords : List String
@@ -150,24 +148,6 @@ logMsg msg = P $ \s => trace "\{s.pos} - \{s.pos + cast leading} : \{show $ take
 public export
 logStatus : {default 10 leading : Nat} -> Parser MayNotConsume ()
 logStatus = P $ \s => trace "Log as position \{s.pos}, next \{leading} character: \{pack $ take leading s.input.next}" $ (OK () s)
-
-
--- -- traceP : Monad m => Parser a -> Parser a
--- -- traceP (P st) = trace "tracing parser" $ P $ \(S inp max pos) =>
--- --                 let () = trace "position before : \{pos}" () in
--- --                     res <- st (S inp max pos)
--- --                     () = case the (Result a) res of
--- --                         OK v st => the Unit (trace "parse succeeeded, consumed : \{take (cast (st.pos - pos))inp}" ())
--- --                         Fail newPos msg => trace "parse failed with error \{show msg}, new position is : \{newPos}" ()
--- --                  in res
---
--- -- try : Parser a -> Parser a
--- -- try (P runParser) =
--- --     P $ \st => rollbackPos st $ runParser st
--- --     where
--- --         rollbackPos : State -> Result a -> Result a
--- --         rollbackPos s (Fail a b ) = Fail s.pos b
--- --         rollbackPos s (OK a b)   = OK a b
 
 mutual
   public export
@@ -334,7 +314,7 @@ parsePattern =
 public export
 reduce : (a -> a -> a) -> List1 a -> a
 reduce f (x ::: []) = x
-reduce f (x ::: (y :: xs)) = f x (reduce f (y ::: xs))
+reduce f (x ::: (y :: xs)) = reduce f (f x y ::: xs)
 
 mutual
   public export
