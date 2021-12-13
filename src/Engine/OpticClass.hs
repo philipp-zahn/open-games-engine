@@ -172,8 +172,8 @@ instance ContextAdd StochasticContext where
 -- Can be used for IO as well
 data MonadOptic s t a b where
   MonadOptic :: (s -> IO (z, a))
-                          -> (z -> b -> StateT Vector IO t)
-                          -> MonadOptic s t a b
+             -> (z -> b -> StateT Vector IO t)
+             -> MonadOptic s t a b
 
 instance Optic MonadOptic where
   lens v u = MonadOptic (\s -> return (s, v s)) (\s b -> return (u s b))

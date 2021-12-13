@@ -6,26 +6,109 @@
 {-# LANGUAGE GADTs #-}
 
 module Examples.Markov.TestSimpleMonteCarlo.Continuation
-  ( sampleDetermineContinuationPayoffsStoch
+  ( _sampleDetermineContinuationPayoffsStoch
   , discountFactor
   ) where
 
-import           Engine.Engine hiding (fromLens,Agent,fromFunctions,discount)
-import           Preprocessor.Preprocessor
-import           Examples.SimultaneousMoves (ActionPD(..),prisonersDilemmaMatrix)
-import           Engine.IOGames
-import           Data.Utils
+import Control.Monad.State ( StateT(StateT), replicateM_ )
+import qualified Control.Monad.State as ST
+    ( MonadState(put, get), MonadTrans(lift), StateT(runStateT) )
+import Data.Utils ( average )
+import qualified Data.Vector as V ( fromList )
+import Debug.Trace ()
+import Engine.Engine
+    ( MonadContext(..),
+      MonadOptic(..),
+      Vector,
+      Stochastic,
+      List(..),
+      OpenGame(evaluate, play),
+      (>>>),
+      (&&&),
+      Kleisli(..),
+      distFromList )
+import Engine.IOGames
+    ( fromFunctions, fromLens, discount, dependentDecisionIO )
+import Examples.SimultaneousMoves
+    ( ActionPD(..), prisonersDilemmaMatrix )
+import Numeric.Probability.Distribution ( decons, certainly )
+import Preprocessor.Preprocessor ( opengame )
+import System.IO.Unsafe ( unsafePerformIO )
+import System.Random.MWC.CondensedTable
+    ( CondensedTableV, tableFromProbabilities )
 
-import           Control.Monad.State  hiding (state,void)
-import qualified Control.Monad.State  as ST
-import qualified Data.Vector as V
-import           Debug.Trace
-import           System.IO.Unsafe
-import           System.Random.MWC.CondensedTable
-import           System.Random
-import           System.Random.Stateful
-import           Numeric.Probability.Distribution hiding (map, lift, filter)
+--------------------------------------------------------------------------------
+-- Entry points
 
+-- printOutput 20 (transformStratTuple strategyTupleTest) (Cooperate,Cooperate)
+-- Own util 1
+-- 45.296
+-- Other actions
+-- [43.957,45.309]
+-- Own util 2
+-- 44.944
+-- Other actions
+-- [44.415,45.746]
+
+printOutput
+  :: Integer
+     -> List
+          '[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
+            Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD]
+     -> (ActionPD, ActionPD)
+     -> IO ()
+printOutput iterator strat initialAction = do
+  let (result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
+  (stratUtil1,ys1) <- result1
+  (stratUtil2,ys2) <- result2
+  putStrLn "Own util 1"
+  print stratUtil1
+  putStrLn "Other actions"
+  print ys1
+  putStrLn "Own util 2"
+
+  print stratUtil2
+  putStrLn "Other actions"
+  print ys2
+
+  where
+
+      repeatedPDEq  iterator strat initialAction =
+        evaluate prisonersDilemmaCont strat context
+        where context  = contextCont iterator strat initialAction
+              -- fix context used for the evaluation
+                where contextCont  iterator strat initialAction =
+                        MonadContext
+                          (pure ((),initialAction))
+                          (\_ action -> determineContinuationPayoffsIO
+                                          iterator strat action)
+
+strategyTupleTest = stageStrategyTest ::- stageStrategyTest ::- Nil
+
+-- | Classic stochastic definition: equal chance of cooperate/defect.
+stageStrategyTest :: Kleisli Stochastic (ActionPD, ActionPD) ActionPD
+stageStrategyTest = Kleisli $ const $ distFromList [(Cooperate, 0.5),(Defect, 0.5)]
+
+--------------------------------------------------------------------------------
+-- Transforming Stochastic to CondensedTableV
+
+transformStratTuple :: List
+                        '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
+                          Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
+                    -> List
+                        '[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
+                          Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD]
+transformStratTuple (x ::- y ::- Nil) =
+  transformStrat x
+  ::- transformStrat y
+  ::- Nil
+
+  where
+    transformStrat strat = Kleisli (\x ->
+      let y = runKleisli strat x
+          ls = decons y
+          v = V.fromList ls
+          in tableFromProbabilities v)
 
 ---------------------------------------------
 -- Contains a first, very, very shaky version
@@ -73,43 +156,6 @@ prisonersDilemmaCont = [opengame|
    returns   :      ;
   |]
 
-
-transformStrat :: Kleisli Stochastic x y -> Kleisli CondensedTableV x y
-transformStrat strat = Kleisli (\x ->
-  let y = runKleisli strat x
-      ls = decons y
-      v = V.fromList ls
-      in tableFromProbabilities v)
-
-
-transformStratTuple :: List
-                        '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
-                          Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
-                    -> List
-                        '[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
-                          Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD]
-transformStratTuple (x ::- y ::- Nil) =
-  transformStrat x
-  ::- transformStrat y
-  ::- Nil
-
-
-
-
--- extract continuation
-extractContinuation :: MonadOptic s () a () -> s -> StateT Vector IO ()
-extractContinuation (MonadOptic v u) x = do
-  (z,a) <- ST.lift (v x)
-  u z ()
-
--- extract next state (action)
-extractNextState :: MonadOptic s () a () -> s -> IO a
-extractNextState (MonadOptic v _) x = do
-  (z,a) <- v x
-  pure a
-
-executeStrat strat =  play prisonersDilemmaCont strat
-
 --------------------------------
 -- This is for the mixed setting
 -- which includes the Bayesian setup
@@ -143,7 +189,7 @@ sampleDetermineContinuationPayoffs sampleSize iterator strat initialValue = do
   ST.put (average sampleSize v)
 
 -- NOTE EVIL EVIL
-sampleDetermineContinuationPayoffsStoch :: Int
+_sampleDetermineContinuationPayoffsStoch :: Int
                                   -- ^ Sample size
                                   -> Integer
                                   -- ^ How many rounds are explored?
@@ -152,7 +198,7 @@ sampleDetermineContinuationPayoffsStoch :: Int
                                               Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
                                   -> (ActionPD,ActionPD)
                                   -> StateT Vector Stochastic ()
-sampleDetermineContinuationPayoffsStoch sampleSize iterator strat initialValue = do
+_sampleDetermineContinuationPayoffsStoch sampleSize iterator strat initialValue = do
    transformStateTIO $  sampleDetermineContinuationPayoffs sampleSize iterator strat initialValue
    where
       transformStateTIO ::  StateT Vector IO () ->  StateT Vector Stochastic ()
@@ -178,58 +224,18 @@ determineContinuationPayoffsIO iterator strat action = do
    determineContinuationPayoffsIO (pred iterator) strat nextInput
  where executeStrat =  play prisonersDilemmaCont strat
 
-
-
--- fix context used for the evaluation
-contextCont  iterator strat initialAction = MonadContext (pure ((),initialAction)) (\_ action -> determineContinuationPayoffsIO iterator strat action)
-
-
-
-repeatedPDEq  iterator strat initialAction = evaluate prisonersDilemmaCont strat context
-  where context  = contextCont iterator strat initialAction
-
-
-printOutput iterator strat initialAction = do
-  let (result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
-  (stratUtil1,ys1) <- result1
-  (stratUtil2,ys2) <- result2
-  putStrLn "Own util 1"
-  print stratUtil1
-  putStrLn "Other actions"
-  print ys1
-  putStrLn "Own util 2"
-  print stratUtil2
-  putStrLn "Other actions"
-  print ys2
-
 ----------------------------------------------------
 -- This is taken from the other MonteCarloTest setup
 -- Needs to be transformed in order to be tested
 
--- Add strategy for stage game
-stageStrategy :: Kleisli Stochastic (ActionPD, ActionPD) ActionPD
-stageStrategy = Kleisli $
-   (\case
-       (Cooperate,Cooperate) -> playDeterministically Cooperate
-       (_,_)         -> playDeterministically Defect)
--- Stage strategy tuple
-strategyTuple = stageStrategy ::- stageStrategy ::- Nil
+-- extract continuation
+extractContinuation :: MonadOptic s () a () -> s -> StateT Vector IO ()
+extractContinuation (MonadOptic v u) x = do
+  (z,a) <- ST.lift (v x)
+  u z ()
 
--- Testing for stoch behavior and slow down
-stageStrategyTest :: Kleisli Stochastic (ActionPD, ActionPD) ActionPD
-stageStrategyTest = Kleisli $ const $ distFromList [(Cooperate, 0.5),(Defect, 0.5)]
--- Stage strategy tuple
-strategyTupleTest = stageStrategyTest ::- stageStrategyTest ::- Nil
-
-
--- Example usage:
-{--
-printOutput 20 (transformStratTuple strategyTupleTest) (Cooperate,Cooperate)
-Own util 1
-45.296
-Other actions
-[43.957,45.309]
-Own util 2
-44.944
-Other actions
-[44.415,45.746]-}
+-- extract next state (action)
+extractNextState :: MonadOptic s () a () -> s -> IO a
+extractNextState (MonadOptic v _) x = do
+  (z,a) <- v x
+  pure a
