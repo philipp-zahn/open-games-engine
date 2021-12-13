@@ -66,8 +66,7 @@ Show TTImp where
 -- jtestParse = Refl
 
 -- testParseVerbose : parseVerbose Main.atomicGameInput === Right {a=String}
---   (MkBlock
---   [PVar "x"]
+--   (MkBlock [PVar "x"]
 --   []
 --   (pure $ MkLine [Var "x"]
 --                  []
@@ -77,7 +76,6 @@ Show TTImp where
 --
 --   [Var "y"]
 --   [PVar "r"])
---
 -- testParseVerbose = Refl
 
 testSame : Eq a => Show a => String -> (given, expected : a) -> IO ()
