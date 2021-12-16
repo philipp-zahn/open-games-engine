@@ -319,12 +319,12 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
 
           -- Sample the average utility from current strategy
           averageUtilStrategy = do
-            actionLS' <- replicateM sampleSize action
+            (_,x) <- h
+            actionLS' <- replicateM sampleSize (action x)
             utilLS  <- mapM u actionLS'
             return (sum utilLS / fromIntegral sampleSize)
 
-            where action = do
-                    (_,x) <- h
+            where action x = do
                     g <- newStdGen
                     gS <- newIOGenM g
                     genFromTable (runKleisli strat x) gS
