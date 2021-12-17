@@ -1,4 +1,4 @@
-{-# language DataKinds, TypeOperators, GADTs, MultiParamTypeClasses, KindSignatures, FlexibleInstances, FlexibleContexts, TypeFamilies, FunctionalDependencies, UndecidableInstances, QuasiQuotes, NamedFieldPuns, PartialTypeSignatures, ScopedTypeVariables #-}
+{-# language DataKinds, TypeOperators, GADTs, MultiParamTypeClasses, KindSignatures, FlexibleInstances, FlexibleContexts, TypeFamilies, FunctionalDependencies, UndecidableInstances, QuasiQuotes, NamedFieldPuns, PartialTypeSignatures, ScopedTypeVariables, GeneralizedNewtypeDeriving , OverloadedStrings #-}
 
 -- |
 
@@ -6,12 +6,15 @@ module Mini (printOutput) where
 
 import           Control.Applicative ( Applicative(liftA2) )
 import           Control.Arrow ( Kleisli(runKleisli, Kleisli) )
+import           Control.Monad.Reader
 import           Control.Monad.State ( StateT(StateT), replicateM_ )
 import           Control.Monad.State ( StateT, replicateM, gets, modify, evalStateT )
 import qualified Control.Monad.State as ST
     ( MonadState(put, get), MonadTrans(lift), StateT(runStateT) )
 import           Control.Monad.Trans.Class as Trans ( MonadTrans(lift) )
+import qualified Data.ByteString.Char8 as S8
 import qualified Data.HashMap as HM ( empty, findWithDefault, Map )
+import           Data.IORef
 import           Data.Kind ( Type )
 import           Data.List (maximumBy)
 import           Data.Ord
@@ -28,6 +31,13 @@ import           System.Random.MWC.CondensedTable
     ( CondensedTableV, tableFromProbabilities )
 import           System.Random.MWC.CondensedTable ( genFromTable, CondensedTableV )
 import           System.Random.Stateful ( newIOGenM )
+import           Text.Printf
+
+--------------------------------------------------------------------------------
+-- Mini-RIO
+
+newtype RIO r a = RIO { runRIO :: ReaderT r IO a } deriving(Functor,Applicative,Monad,MonadIO)
+data Rdr = Rdr { indentRef :: IORef Int }
 
 --------------------------------------------------------------------------------
 -- TLL
@@ -230,8 +240,8 @@ type Vector = HM.Map String Double
 -- Same as used in learning implementation
 -- Can be used for IO as well
 data MonadOptic s t a b where
-  MonadOptic :: (s -> IO (z, a))
-             -> (z -> b -> StateT Vector IO t)
+  MonadOptic :: (s -> RIO Rdr (z, a))
+             -> (z -> b -> StateT Vector (RIO Rdr) t)
              -> MonadOptic s t a b
 
 instance Optic MonadOptic where
@@ -249,7 +259,7 @@ instance Optic MonadOptic where
           u (Right z2) b = u2 z2 b
 
 data MonadContext s t a b where
-  MonadContext :: (Show z) => IO (z, s) -> (z -> a -> StateT Vector IO b) -> MonadContext s t a b
+  MonadContext :: (Show z) => (RIO Rdr) (z, s) -> (z -> a -> StateT Vector (RIO Rdr) b) -> MonadContext s t a b
 
 instance Precontext MonadContext where
   void = MonadContext (return ((), ())) (\() () -> return ())
@@ -275,10 +285,10 @@ instance Context MonadContext MonadOptic where
 type IOOpenGame a b x s y r = OpenGame MonadOptic MonadContext a b x s y r
 
 dependentDecisionIO
-  :: String
+  :: forall x. Show x => String
   -> Int
   -> [ActionPD]
-  -> IOOpenGame '[Kleisli CondensedTableV x ActionPD] '[IO (Double,[Double])] x () ActionPD Double
+  -> IOOpenGame '[Kleisli CondensedTableV x ActionPD] '[(RIO Rdr) (Diagnostics ActionPD)] x () ActionPD Double
 dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
 
   play :: List '[Kleisli CondensedTableV x ActionPD]
@@ -291,13 +301,14 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
         g <- newStdGen
         gS <- newIOGenM g
         action <- genFromTable (runKleisli strat x) gS
+        logstr (take 1 (show action))
         return ((),action)
 
       u () r = modify (adjustOrAdd (+ r) r name)
 
   evaluate :: List '[Kleisli CondensedTableV x ActionPD]
            -> MonadContext x () ActionPD Double
-           -> List '[IO (Double, [Double])]
+           -> List '[(RIO Rdr) (Diagnostics ActionPD)]  ----     <-- do this next
   evaluate (strat ::- Nil) (MonadContext h k) =
     output ::- Nil
 
@@ -306,35 +317,109 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
       output = do
         samplePayoffs' <- samplePayoffs
         averageUtilStrategy' <- averageUtilStrategy
-        return $ (averageUtilStrategy', samplePayoffs')
+        return  Diagnostics{
+            playerName = name
+          , averageUtilStrategy = averageUtilStrategy'
+          , samplePayoffs = samplePayoffs'
+          , currentMove = 0
+          }
 
         where
           -- Sample the average utility from all actions
-          samplePayoffs = mapM sampleY ys
+          samplePayoffs = do newline
+                             logln (name ++ ": samplePayoffs")
+                             indent
+                             vs <- mapM sampleY ys
+                             deindent
+                             pure vs
             where
               -- Sample the average utility from a single action
                sampleY y = do
-                  ls1 <- replicateM sampleSize (u y)
-                  pure  (sum ls1 / fromIntegral sampleSize)
+                  newline
+                  logln (name ++ ": sampleY: " ++ show y)
+                  indent
+                  ls1 <- mapM (\i -> do newline
+                                        logstr ("[" ++ printf "%3i" i ++ "]  ")
+                                        indent
+                                        v <- u y
+                                        logstr (" => " ++ show v)
+                                        deindent
+                                        pure v) [1..sampleSize]
+                  newline
+                  let average =  (sum ls1 / fromIntegral sampleSize)
+                  newline
+                  logstr ("average=" ++ show average)
+
+                  deindent
+                  pure average
 
           -- Sample the average utility from current strategy
           averageUtilStrategy = do
+            newline
+            newline
+            logstr "averageUtilStrategy"
+            indent
+            newline
+            newline
+
+            logstr "h'["
             (_,x) <- h
+            logstr "]"
+            newline
+            logstr ("x=" ++ show x)
+            newline
             g <- newStdGen
             gS <- newIOGenM g
-            actionLS' <- replicateM sampleSize (action x gS)
-            utilLS  <- mapM u actionLS'
-            return (sum utilLS / fromIntegral sampleSize)
+            logstr "actions"
+            indent
+            newline
+            newline
+            actionLS' <- mapM (\i -> do
+                                        v <- action x gS
+                                        logstr (take 1 (show v))
+                                        pure v)
+                             [1.. sampleSize]
+            deindent
+            newline
+            newline
+            logstr "utils"
+            indent
+            utilLS  <- mapM (\(i,a) ->
+                                   do newline
+                                      logstr ("[" ++ printf "%3i %9s" i (show a) ++ "] ")
+                                      v <- u a
+                                      logstr (" => " ++ show v)
+                                      pure v
+                             )
+                        (zip [1 :: Int ..] actionLS')
+
+
+            newline
+            deindent
+            newline
+            let average = (sum utilLS / fromIntegral sampleSize)
+            logstr ("average=" ++ show average)
+            deindent
+            newline
+
+            return average
 
             where action x gS = do
                     genFromTable (runKleisli strat x) gS
 
           u y = do
+             logstr "u["
+             logstr "h["
              (z,_) <- h
-             evalStateT (do r <- k z y
-                            gets ((+ r) . HM.findWithDefault 0.0 name))
-                         HM.empty
-
+             logstr "]"
+             v <-
+              evalStateT (do Trans.lift $ logstr "k["
+                             r <- k z y
+                             Trans.lift $ logstr "]"
+                             gets ((+ r) . HM.findWithDefault 0.0 name))
+                          HM.empty
+             logstr "]"
+             pure v
 -- Support functionality for constructing open games
 fromLens :: (x -> y) -> (x -> r -> s) -> IOOpenGame '[] '[] x s y r
 fromLens v u = OpenGame {
@@ -356,7 +441,7 @@ discount name f = OpenGame {
   evaluate = \_ _ -> Nil}
 
 deviationsInContext :: (Show a, Ord a)
-                    =>  Agent -> a -> (a -> IO Double) -> [a] -> IO [DiagnosticInfoIO a]
+                    =>  Agent -> a -> (a -> (RIO Rdr) Double) -> [a] -> (RIO Rdr) [DiagnosticInfoIO a]
 deviationsInContext name strategy u ys = do
      ls              <- mapM u ys
      strategicPayoff <- u strategy
@@ -368,6 +453,7 @@ deviationsInContext name strategy u ys = do
             , optimalPayoffIO = optimalPayoff
             , currentMoveIO   = strategy
             , currentPayoffIO = strategicPayoff
+            , otherActions = [] -- TODO: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             }]
 
 data DiagnosticInfoIO y = DiagnosticInfoIO
@@ -375,10 +461,19 @@ data DiagnosticInfoIO y = DiagnosticInfoIO
   , optimalMoveIO     :: y
   , optimalPayoffIO   :: Double
   , currentMoveIO     :: y
-  , currentPayoffIO   :: Double}
+  , currentPayoffIO   :: Double
+  , otherActions      :: [Double]
+  } deriving Show
 
 type Agent = String
 
+data Diagnostics y = Diagnostics {
+  playerName :: String
+  , averageUtilStrategy :: Double
+  , samplePayoffs :: [Double]
+  , currentMove :: Double
+  }
+  deriving (Show)
 
 --------------------------------------------------------------------------------
 -- Instance of a game
@@ -404,30 +499,43 @@ printOutput
      -> (ActionPD, ActionPD)
      -> IO ()
 printOutput iterator strat initialAction = do
+  ref <- newIORef 0
+  flip runReaderT Rdr{indentRef=ref} $ runRIO $ do
   let (result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
-  (stratUtil1,ys1) <- result1
-  (stratUtil2,ys2) <- result2
-  putStrLn "Own util 1"
-  print stratUtil1
-  putStrLn "Other actions"
-  print ys1
-  putStrLn "Own util 2"
+  -- (stratUtil1,ys1) <- result1
+  diagnosticInfoIO1 <- result1
+  -- (stratUtil2,ys2) <- result2
+  diagnosticInfoIO2 <- result2
+  logln "player 1"
+  logln $ show diagnosticInfoIO1
+  logln "player 2"
+  logln $ show diagnosticInfoIO2
+  -- putStrLn "Other actions"
+  -- print ys1
+  -- putStrLn "Own util 2"
 
-  print stratUtil2
-  putStrLn "Other actions"
-  print ys2
+  -- print stratUtil2
+  -- putStrLn "Other actions"
+  -- print ys2
+  pure ()
 
-  where
-
-      repeatedPDEq  iterator strat initialAction =
-        evaluate prisonersDilemmaCont strat context
-        where context  = contextCont iterator strat initialAction
-              -- fix context used for the evaluation
-                where contextCont  iterator strat initialAction =
-                        MonadContext
-                          (pure ((),initialAction))
-                          (\_ action -> determineContinuationPayoffsIO
-                                          iterator strat action)
+repeatedPDEq
+  :: Integer
+     -> List
+          '[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
+            Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD]
+     -> (ActionPD, ActionPD)
+     -> List
+          '[(RIO Rdr) (Diagnostics ActionPD), (RIO Rdr) (Diagnostics ActionPD)]
+repeatedPDEq  iterator strat initialAction =
+  evaluate prisonersDilemmaCont strat context
+  where context  = contextCont iterator strat initialAction
+        -- fix context used for the evaluation
+          where contextCont  iterator strat initialAction =
+                  MonadContext
+                    (pure ((),initialAction))
+                    (\_ action -> determineContinuationPayoffsIO
+                                    iterator strat action)
 
 strategyTupleTest = stageStrategyTest ::- stageStrategyTest ::- Nil
 
@@ -473,7 +581,7 @@ prisonersDilemmaCont :: OpenGame
                           MonadContext
                           ('[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
                              Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD])
-                          ('[IO (Double,[Double]), IO (Double, [Double])])
+                          ('[(RIO Rdr) (Diagnostics ActionPD), (RIO Rdr) (Diagnostics ActionPD)])
                           (ActionPD, ActionPD)
                           ()
                           (ActionPD, ActionPD)
@@ -517,7 +625,7 @@ determineContinuationPayoffs :: Integer
                                       '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
                                         Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
                              -> (ActionPD,ActionPD)
-                             -> StateT Vector IO ()
+                             -> StateT Vector (RIO Rdr) ()
 determineContinuationPayoffs 1        _ _ = pure ()
 determineContinuationPayoffs iterator strat action = do
    extractContinuation executeStrat action
@@ -534,31 +642,31 @@ sampleDetermineContinuationPayoffs :: Int
                                             '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
                                               Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
                                   -> (ActionPD,ActionPD)
-                                  -> StateT Vector IO ()
+                                  -> StateT Vector (RIO Rdr) ()
 sampleDetermineContinuationPayoffs sampleSize iterator strat initialValue = do
   replicateM_ sampleSize (determineContinuationPayoffs iterator strat initialValue)
   v <- ST.get
   ST.put (average sampleSize v)
 
--- NOTE EVIL EVIL
-_sampleDetermineContinuationPayoffsStoch :: Int
-                                  -- ^ Sample size
-                                  -> Integer
-                                  -- ^ How many rounds are explored?
-                                  -> List
-                                            '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
-                                              Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
-                                  -> (ActionPD,ActionPD)
-                                  -> StateT Vector Stochastic ()
-_sampleDetermineContinuationPayoffsStoch sampleSize iterator strat initialValue = do
-   transformStateTIO $  sampleDetermineContinuationPayoffs sampleSize iterator strat initialValue
-   where
-      transformStateTIO ::  StateT Vector IO () ->  StateT Vector Stochastic ()
-      transformStateTIO sTT = StateT (\s -> unsafeTransformIO $  ST.runStateT sTT s)
-      unsafeTransformIO :: IO a -> Stochastic a
-      unsafeTransformIO a =
-        let a' = unsafePerformIO a
-            in certainly a'
+-- -- NOTE EVIL EVIL
+-- _sampleDetermineContinuationPayoffsStoch :: Int
+--                                   -- ^ Sample size
+--                                   -> Integer
+--                                   -- ^ How many rounds are explored?
+--                                   -> List
+--                                             '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
+--                                               Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
+--                                   -> (ActionPD,ActionPD)
+--                                   -> StateT Vector Stochastic ()
+-- _sampleDetermineContinuationPayoffsStoch sampleSize iterator strat initialValue = do
+--    transformStateTIO $  sampleDetermineContinuationPayoffs sampleSize iterator strat initialValue
+--    where
+--       transformStateTIO ::  StateT Vector (RIO Rdr) () ->  StateT Vector Stochastic ()
+--       transformStateTIO sTT = StateT (\s -> unsafeTransformIO $  ST.runStateT sTT s)
+--       unsafeTransformIO :: (RIO Rdr) a -> Stochastic a
+--       unsafeTransformIO a =
+--         let a' = unsafePerformIO (runa
+--             in certainly a'
 
 -----------------------------
 -- For IO only
@@ -568,7 +676,7 @@ determineContinuationPayoffsIO :: Integer
                                      [Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
                                      Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD]
                                -> (ActionPD,ActionPD)
-                               -> StateT Vector IO ()
+                               -> StateT Vector (RIO Rdr) ()
 determineContinuationPayoffsIO 1       _strat _action = pure ()
 determineContinuationPayoffsIO iterator strat action = do
    extractContinuation executeStrat action
@@ -581,13 +689,13 @@ determineContinuationPayoffsIO iterator strat action = do
 -- Needs to be transformed in order to be tested
 
 -- extract continuation
-extractContinuation :: MonadOptic s () a () -> s -> StateT Vector IO ()
+extractContinuation :: MonadOptic s () a () -> s -> StateT Vector (RIO Rdr) ()
 extractContinuation (MonadOptic v u) x = do
   (z,_) <- ST.lift (v x)
   u z ()
 
 -- extract next state (action)
-extractNextState :: MonadOptic s () a () -> s -> IO a
+extractNextState :: MonadOptic s () a () -> s -> (RIO Rdr) a
 extractNextState (MonadOptic v _) x = do
   (_,a) <- v x
   pure a
@@ -605,3 +713,23 @@ prisonersDilemmaMatrix Cooperate Cooperate   = 3
 prisonersDilemmaMatrix Cooperate Defect  = 0
 prisonersDilemmaMatrix Defect Cooperate  = 5
 prisonersDilemmaMatrix Defect Defect = 1
+
+logln :: String -> (RIO Rdr) ()
+logln s = do newline; logstr s; newline
+
+logstr :: String -> (RIO Rdr) ()
+logstr s = liftIO $ S8.putStr (S8.pack s)
+
+newline  :: RIO Rdr ()
+newline = RIO (
+   do Rdr{indentRef} <- ask
+      liftIO $
+       do i <- readIORef indentRef
+          S8.putStr ("\n" <> S8.replicate i ' ')
+ )
+
+indent :: RIO Rdr ()
+indent = RIO (do Rdr{indentRef} <- ask; liftIO $ modifyIORef' indentRef (+4))
+
+deindent :: RIO Rdr ()
+deindent = RIO (do Rdr{indentRef} <- ask; liftIO $ modifyIORef' indentRef (subtract 4))
