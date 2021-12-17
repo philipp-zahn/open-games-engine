@@ -13,7 +13,7 @@ import qualified Control.Monad.State as ST
     ( MonadState(put, get), MonadTrans(lift), StateT(runStateT) )
 import           Control.Monad.Trans.Class as Trans ( MonadTrans(lift) )
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.HashMap as HM ( empty, findWithDefault, Map )
+import qualified Data.HashMap as HM ( empty, findWithDefault, Map, lookup )
 import           Data.IORef
 import           Data.Kind ( Type )
 import           Data.List (maximumBy)
@@ -416,6 +416,10 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
               evalStateT (do Trans.lift $ logstr "k["
                              r <- k z y
                              Trans.lift $ logstr "]"
+                             mp <- gets id
+                             Trans.lift $ case HM.lookup name mp of
+                               Nothing -> logstr "!"
+                               Just{} -> logstr "@"
                              gets ((+ r) . HM.findWithDefault 0.0 name))
                           HM.empty
              logstr "]"
