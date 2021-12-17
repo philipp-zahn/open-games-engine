@@ -301,7 +301,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
         g <- newStdGen
         gS <- newIOGenM g
         action <- genFromTable (runKleisli strat x) gS
-        logstr (take 1 (show action))
+        logstr (name ++ take 1 (show action))
         return ((),action)
 
       u () r = modify (adjustOrAdd (+ r) r name)
@@ -386,7 +386,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
             indent
             utilLS  <- mapM (\(i,a) ->
                                    do newline
-                                      logstr ("[" ++ printf "%3i %9s" i (show a) ++ "] ")
+                                      logstr ("[" ++ printf "%3i %s" i (take 1 $ show a) ++ "] ")
                                       v <- u a
                                       logstr (" => " ++ show v)
                                       pure v
@@ -596,19 +596,19 @@ prisonersDilemmaCont = [opengame|
    :----------------------------:
    inputs    :  (dec1Old,dec2Old)    ;
    feedback  :      ;
-   operation : dependentDecisionIO "player1" 100 [Cooperate,Defect];
+   operation : dependentDecisionIO "1" 100 [Cooperate,Defect];
    outputs   : decisionPlayer1 ;
    returns   : prisonersDilemmaMatrix decisionPlayer1 decisionPlayer2 ;
 
    inputs    :   (dec1Old,dec2Old)   ;
    feedback  :      ;
-   operation : dependentDecisionIO "player2" 100 [Cooperate,Defect];
+   operation : dependentDecisionIO "2" 100 [Cooperate,Defect];
    outputs   : decisionPlayer2 ;
    returns   : prisonersDilemmaMatrix decisionPlayer2 decisionPlayer1 ;
 
-   operation : discount "player1" (\x -> x * discountFactor) ;
+   operation : discount "1" (\x -> x * discountFactor) ;
 
-   operation : discount "player2" (\x -> x * discountFactor) ;
+   operation : discount "2" (\x -> x * discountFactor) ;
 
    :----------------------------:
 
