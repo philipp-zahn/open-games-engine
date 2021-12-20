@@ -4,6 +4,7 @@
 
 module Mini (printOutput) where
 
+import RIO (RIO, runRIO)
 import           Control.Applicative ( Applicative(liftA2) )
 import           Control.Arrow ( Kleisli(runKleisli, Kleisli) )
 import           Control.Monad.Reader
@@ -38,7 +39,7 @@ import           Text.Printf
 --------------------------------------------------------------------------------
 -- Mini-RIO
 
-newtype RIO r a = RIO { runRIO :: ReaderT r IO a } deriving(Functor,Applicative,Monad,MonadIO)
+-- newtype RIO r a = RIO { runRIO :: ReaderT r IO a } deriving(Functor,Applicative,Monad,MonadIO)
 data Rdr = Rdr { indentRef :: IORef Int }
 
 --------------------------------------------------------------------------------
@@ -322,7 +323,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
         g <- newStdGen
         gS <- newIOGenM g
         action <- genFromTable (runKleisli strat x) gS
-        logstr (name ++ take 1 (show action))
+        -- logstr (name ++ take 1 (show action))
         return ((),action)
 
       u () r = modify (adjustOrAdd (+ r) r name)
@@ -347,81 +348,81 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
 
         where
           -- Sample the average utility from all actions
-          samplePayoffs = do newline
-                             logln (name ++ ": samplePayoffs")
-                             indent
+          samplePayoffs = do -- newline
+                             -- logln (name ++ ": samplePayoffs")
+                             -- indent
                              vs <- mapM sampleY ys
-                             deindent
+                             -- deindent
                              pure vs
             where
               -- Sample the average utility from a single action
                sampleY y = do
-                  newline
-                  logln (name ++ ": sampleY: " ++ show y)
-                  indent
-                  ls1 <- mapM (\i -> do newline
-                                        logstr ("[" ++ printf "%3i" i ++ "]  ")
-                                        indent
+                  -- newline
+                  -- logln (name ++ ": sampleY: " ++ show y)
+                  -- indent
+                  ls1 <- mapM (\i -> do -- newline
+                                        -- logstr ("[" ++ printf "%3i" i ++ "]  ")
+                                        -- indent
                                         v <- u y
-                                        logstr (" => " ++ show v)
-                                        deindent
+                                        -- logstr (" => " ++ show v)
+                                        -- deindent
                                         pure v) [1..sampleSize]
-                  newline
+                  -- newline
                   let average =  (sum ls1 / fromIntegral sampleSize)
-                  newline
-                  logstr ("average=" ++ show average)
+                  -- newline
+                  -- logstr ("average=" ++ show average)
 
-                  deindent
+                  -- deindent
                   pure average
 
           -- Sample the average utility from current strategy
           averageUtilStrategy = do
-            newline
-            newline
-            logstr "averageUtilStrategy"
-            indent
-            newline
-            newline
+            -- newline
+            -- newline
+            -- logstr "averageUtilStrategy"
+            -- indent
+            -- newline
+            -- newline
 
-            logstr "h'["
+            -- logstr "h'["
             (_,x) <- h
-            logstr "]"
-            newline
-            logstr ("x=" ++ show x)
-            newline
+            -- logstr "]"
+            -- newline
+            -- logstr ("x=" ++ show x)
+            -- newline
             g <- newStdGen
             gS <- newIOGenM g
-            logstr "actions"
-            indent
-            newline
-            newline
+            -- logstr "actions"
+            -- indent
+            -- newline
+            -- newline
             actionLS' <- mapM (\i -> do
                                         v <- action x gS
-                                        logstr (take 1 (show v))
+                                        -- logstr (take 1 (show v))
                                         pure v)
                              [1.. sampleSize]
-            deindent
-            newline
-            newline
-            logstr "utils"
-            indent
+            -- deindent
+            -- newline
+            -- newline
+            -- logstr "utils"
+            -- indent
             utilLS  <- mapM (\(i,a) ->
-                                   do newline
-                                      logstr ("[" ++ printf "%3i %s" i (take 1 $ show a) ++ "] ")
+                                   do -- newline
+                                      -- logstr ("[" ++ printf "%3i %s" i (take 1 $ show a) ++ "] ")
                                       v <- u a
-                                      logstr (" => " ++ show v)
+                                      -- logstr (" => " ++ show v)
                                       pure v
                              )
                         (zip [1 :: Int ..] actionLS')
 
 
-            newline
-            deindent
-            newline
+            -- newline
+            -- deindent
+            -- newline
             let average = (sum utilLS / fromIntegral sampleSize)
-            logstr ("average=" ++ show average)
-            deindent
-            newline
+            -- logstr ("average=" ++ show average)
+            -- deindent
+            -- newline
 
             return average
 
@@ -429,21 +430,21 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
                     genFromTable (runKleisli strat x) gS
 
           u y = do
-             logstr "u["
-             logstr "h["
+             -- logstr "u["
+             -- logstr "h["
              (z,_) <- h
-             logstr "]"
+             -- logstr "]"
              v <-
-              evalStateT (do Trans.lift $ logstr "k["
+              evalStateT (do -- Trans.lift $ logstr "k["
                              r <- k z y
-                             Trans.lift $ logstr "]"
+                             -- Trans.lift $ logstr "]"
                              mp <- gets id
-                             Trans.lift $ case HM.lookup name mp of
-                               Nothing -> logstr "!"
-                               Just{} -> logstr "@"
+                             -- Trans.lift $ case HM.lookup name mp of
+                             --   Nothing -> logstr "!"
+                             --   Just{} -> logstr "@"
                              gets ((+ r) . HM.findWithDefault 0.0 name))
                           HM.empty
-             logstr "]"
+             -- logstr "]"
              pure v
 -- Support functionality for constructing open games
 fromLens :: (x -> y) -> (x -> r -> s) -> IOOpenGame '[] '[] x s y r
@@ -525,7 +526,7 @@ printOutput
      -> IO ()
 printOutput iterator strat initialAction = do
   ref <- newIORef 0
-  flip runReaderT Rdr{indentRef=ref} $ runRIO $ do
+  runRIO Rdr{indentRef=ref} $ do
   let resultIOs@(result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
   traverseList_ (Proxy :: Proxy Show) (liftIO . print) resultIOs
   pure ()
@@ -742,22 +743,22 @@ prisonersDilemmaMatrix Cooperate Defect  = 0
 prisonersDilemmaMatrix Defect Cooperate  = 5
 prisonersDilemmaMatrix Defect Defect = 1
 
-logln :: String -> (RIO Rdr) ()
-logln s = do newline; logstr s; newline
+-- logln :: String -> (RIO Rdr) ()
+-- logln s = do newline; logstr s; newline
 
-logstr :: String -> (RIO Rdr) ()
-logstr s = liftIO $ S8.putStr (S8.pack s)
+-- logstr :: String -> (RIO Rdr) ()
+-- logstr s = liftIO $ S8.putStr (S8.pack s)
 
-newline  :: RIO Rdr ()
-newline = RIO (
-   do Rdr{indentRef} <- ask
-      liftIO $
-       do i <- readIORef indentRef
-          S8.putStr ("\n" <> S8.replicate i ' ')
- )
+-- newline  :: RIO Rdr ()
+-- newline = RIO (
+--    do Rdr{indentRef} <- ask
+--       liftIO $
+--        do i <- readIORef indentRef
+--           S8.putStr ("\n" <> S8.replicate i ' ')
+--  )
 
-indent :: RIO Rdr ()
-indent = RIO (do Rdr{indentRef} <- ask; liftIO $ modifyIORef' indentRef (+4))
+-- indent :: RIO Rdr ()
+-- indent = RIO (do Rdr{indentRef} <- ask; liftIO $ modifyIORef' indentRef (+4))
 
-deindent :: RIO Rdr ()
-deindent = RIO (do Rdr{indentRef} <- ask; liftIO $ modifyIORef' indentRef (subtract 4))
+-- deindent :: RIO Rdr ()
+-- deindent = RIO (do Rdr{indentRef} <- ask; liftIO $ modifyIORef' indentRef (subtract 4))
