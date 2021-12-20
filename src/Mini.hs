@@ -1,8 +1,8 @@
-{-# language DataKinds, TypeOperators, GADTs, MultiParamTypeClasses, KindSignatures, FlexibleInstances, FlexibleContexts, TypeFamilies, FunctionalDependencies, UndecidableInstances, QuasiQuotes, NamedFieldPuns, PartialTypeSignatures, ScopedTypeVariables, GeneralizedNewtypeDeriving , OverloadedStrings, Rank2Types, ConstraintKinds, LambdaCase #-}
+{-# language DataKinds, TypeOperators, GADTs, MultiParamTypeClasses, KindSignatures, FlexibleInstances, FlexibleContexts, TypeFamilies, FunctionalDependencies, UndecidableInstances, QuasiQuotes, NamedFieldPuns, PartialTypeSignatures, ScopedTypeVariables, GeneralizedNewtypeDeriving , OverloadedStrings, Rank2Types, ConstraintKinds, LambdaCase, RecordWildCards #-}
 
 -- |
 
-module Mini (printOutput) where
+
 
 import           Control.Applicative ( Applicative(liftA2) )
 import           Control.Arrow ( Kleisli(runKleisli, Kleisli) )
@@ -39,6 +39,8 @@ import           System.Random.MWC.CondensedTable
 import           System.Random.MWC.CondensedTable ( genFromTable, CondensedTableV )
 import           System.Random.Stateful ( newIOGenM )
 import           Text.Printf
+
+main = printOutput 20 (transformStratTuple strategyTupleTest) (Cooperate,Cooperate)
 
 --------------------------------------------------------------------------------
 -- Mini-RIO
@@ -550,16 +552,27 @@ printOutput
      -> IO ()
 printOutput iterator strat initialAction = do
   indentRef <- newIORef 0
-  runRIO (mkGLogFunc (logFuncStructured indentRef)) $ do
+  runRIO (mkGLogFunc logFuncTracing) $ do
     let resultIOs@(result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
     traverseList_ (Proxy :: Proxy Show) (liftIO . print) resultIOs
     pure ()
 
+-- ignore this one
+logFuncTracing _ (AsPlayer _ (SamplePayoffs (SampleRootMsg _ (CalledK {})))) = pure ()
+logFuncTracing _ (AsPlayer _ (AverageUtility (AverageRootMsg (CalledK {})))) = pure ()
 logFuncTracing callStack msg = do
   case getCallStack callStack of
      [("glog", srcloc)] -> do
        fp <- makeRelativeToCurrentDirectory (srcLocFile srcloc)
-       S8.putStrLn (S8.pack (show msg ++ " (" ++ prettySrcLoc (srcloc{srcLocFile=fp}) ++ ")"))
+       S8.putStrLn (S8.pack (prettySrcLoc0 (srcloc{srcLocFile=fp}) ++ show msg))
+
+prettySrcLoc0 :: SrcLoc -> String
+prettySrcLoc0 SrcLoc {..}
+  = foldr (++) ""
+      [ srcLocFile, ":"
+      , show srcLocStartLine, ":"
+      , show srcLocStartCol, ": "
+      ]
 
 data Readr = Readr { indentRef :: IORef Int }
 logFuncStructured indentRef _ msg = flip runReaderT Readr{indentRef} (go msg)
