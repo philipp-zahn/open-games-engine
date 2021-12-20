@@ -1,4 +1,4 @@
-{-# language DataKinds, TypeOperators, GADTs, MultiParamTypeClasses, KindSignatures, FlexibleInstances, FlexibleContexts, TypeFamilies, FunctionalDependencies, UndecidableInstances, QuasiQuotes, NamedFieldPuns, PartialTypeSignatures, ScopedTypeVariables, GeneralizedNewtypeDeriving , OverloadedStrings #-}
+{-# language DataKinds, TypeOperators, GADTs, MultiParamTypeClasses, KindSignatures, FlexibleInstances, FlexibleContexts, TypeFamilies, FunctionalDependencies, UndecidableInstances, QuasiQuotes, NamedFieldPuns, PartialTypeSignatures, ScopedTypeVariables, GeneralizedNewtypeDeriving , OverloadedStrings, Rank2Types, ConstraintKinds, LambdaCase #-}
 
 -- |
 
@@ -13,11 +13,13 @@ import qualified Control.Monad.State as ST
     ( MonadState(put, get), MonadTrans(lift), StateT(runStateT) )
 import           Control.Monad.Trans.Class as Trans ( MonadTrans(lift) )
 import qualified Data.ByteString.Char8 as S8
+import           Data.Foldable
 import qualified Data.HashMap as HM ( empty, findWithDefault, Map, lookup )
 import           Data.IORef
-import           Data.Kind ( Type )
+import           Data.Kind ( Type, Constraint )
 import           Data.List (maximumBy)
 import           Data.Ord
+import           Data.Proxy
 import           Data.Utils ( adjustOrAdd )
 import           Data.Utils ( average )
 import qualified Data.Vector as V ( fromList )
@@ -121,6 +123,25 @@ instance Applicative m => SequenceList m '[] '[] where
 instance (Applicative m, SequenceList m as bs) => SequenceList m (m a ': as) (a ': bs) where
     sequenceListA (a ::- b) = liftA2 (::-) a (sequenceListA b)
 
+--------------------------------------------------------------------------------
+
+class Monad m => TraverseList_ (ctx :: * -> Constraint) m a b | a -> b, m b -> a where
+  traverseList_
+    :: Proxy ctx
+     -> (forall x. ctx x => x -> m ())
+    -> List a
+    -> m (List b)
+
+instance Monad m => TraverseList_ ctx m '[] '[] where
+  traverseList_ _proxy _f _ = pure Nil
+
+instance (ctx a, Monad m, TraverseList_ ctx m as bs)
+       => TraverseList_ ctx m (m a ': as) (a ': bs) where
+  traverseList_ proxy f (a ::- b) = do
+    x <- a
+    f x
+    xs <- traverseList_ proxy f b
+    pure (x ::- xs)
 
 -- Indexing on the list
 
@@ -505,15 +526,18 @@ printOutput
 printOutput iterator strat initialAction = do
   ref <- newIORef 0
   flip runReaderT Rdr{indentRef=ref} $ runRIO $ do
-  let (result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
-  -- (stratUtil1,ys1) <- result1
-  diagnosticInfoIO1 <- result1
-  -- (stratUtil2,ys2) <- result2
-  diagnosticInfoIO2 <- result2
-  logln "player 1"
-  logln $ show diagnosticInfoIO1
-  logln "player 2"
-  logln $ show diagnosticInfoIO2
+  let resultIOs@(result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
+  traverseList_ (Proxy :: Proxy Show) (liftIO . print) resultIOs
+  pure ()
+
+  -- -- (stratUtil1,ys1) <- result1
+  -- diagnosticInfoIO1 <- result1
+  -- -- (stratUtil2,ys2) <- result2
+  -- diagnosticInfoIO2 <- result2
+  -- logln "player 1"
+  -- logln $ show diagnosticInfoIO1
+  -- logln "player 2"
+  -- logln $ show diagnosticInfoIO2
   -- putStrLn "Other actions"
   -- print ys1
   -- putStrLn "Own util 2"
