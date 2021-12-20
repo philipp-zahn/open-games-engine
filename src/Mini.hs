@@ -139,23 +139,23 @@ instance (Applicative m, SequenceList m as bs) => SequenceList m (m a ': as) (a 
 
 --------------------------------------------------------------------------------
 
-class Monad m => TraverseList_ (ctx :: * -> Constraint) m a b | a -> b, m b -> a where
+class Monad m => TraverseList_ (ctx :: * -> Constraint) m a where
   traverseList_
     :: Proxy ctx
      -> (forall x. ctx x => x -> m ())
     -> List a
-    -> m (List b)
+    -> m ()
 
-instance Monad m => TraverseList_ ctx m '[] '[] where
-  traverseList_ _proxy _f _ = pure Nil
+instance Monad m => TraverseList_ ctx m '[] where
+  traverseList_ _proxy _f _ = pure ()
 
-instance (ctx a, Monad m, TraverseList_ ctx m as bs)
-       => TraverseList_ ctx m (m a ': as) (a ': bs) where
+instance (ctx a, Monad m, TraverseList_ ctx m as)
+       => TraverseList_ ctx m (m a ': as) where
   traverseList_ proxy f (a ::- b) = do
     x <- a
     f x
     xs <- traverseList_ proxy f b
-    pure (x ::- xs)
+    pure ()
 
 -- Indexing on the list
 
