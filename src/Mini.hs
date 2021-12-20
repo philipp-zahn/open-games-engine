@@ -4,7 +4,6 @@
 
 module Mini (printOutput) where
 
-import RIO (RIO, runRIO)
 import           Control.Applicative ( Applicative(liftA2) )
 import           Control.Arrow ( Kleisli(runKleisli, Kleisli) )
 import           Control.Monad.Reader
@@ -15,6 +14,7 @@ import qualified Control.Monad.State as ST
 import           Control.Monad.Trans.Class as Trans ( MonadTrans(lift) )
 import qualified Data.ByteString.Char8 as S8
 import           Data.Foldable
+import           Data.Functor.Contravariant
 import qualified Data.HashMap as HM ( empty, findWithDefault, Map, lookup )
 import           Data.IORef
 import           Data.Kind ( Type, Constraint )
@@ -25,9 +25,13 @@ import           Data.Utils ( adjustOrAdd )
 import           Data.Utils ( average )
 import qualified Data.Vector as V ( fromList )
 import           Debug.Trace ()
+import           GHC.Stack
 import           Numeric.Probability.Distribution ( certainly )
 import           Numeric.Probability.Distribution ( fromFreqs, T(decons) )
 import           Preprocessor.Preprocessor ( opengame )
+import qualified RIO
+import           RIO (RIO, runRIO, GLogFunc, glog, mkGLogFunc, mapRIO)
+import           System.Directory
 import           System.IO.Unsafe ( unsafePerformIO )
 import           System.Random ( newStdGen )
 import           System.Random.MWC.CondensedTable
@@ -39,9 +43,16 @@ import           Text.Printf
 --------------------------------------------------------------------------------
 -- Mini-RIO
 
--- newtype RIO r a = RIO { runRIO :: ReaderT r IO a } deriving(Functor,Applicative,Monad,MonadIO)
-data Rdr = Rdr { indentRef :: IORef Int }
+type Rdr = GLogFunc Msg
 
+data Msg = AsPlayer String PlayerMsg | UStart | UEnd | WithinU Msg | CalledK Msg | VChooseAction ActionPD
+  deriving Show
+data PlayerMsg = Outputting | SamplePayoffs SamplePayoffsMsg | AverageUtility AverageUtilityMsg
+  deriving Show
+data SamplePayoffsMsg = SampleAction ActionPD | SampleRootMsg Int Msg | SampleAverageIs Double
+  deriving Show
+data AverageUtilityMsg = StartingAverageUtil | AverageRootMsg Msg | AverageActionChosen ActionPD | AverageIterAction Int ActionPD | AverageComplete Double
+  deriving Show
 --------------------------------------------------------------------------------
 -- TLL
 
@@ -323,6 +334,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
         g <- newStdGen
         gS <- newIOGenM g
         action <- genFromTable (runKleisli strat x) gS
+        glog (VChooseAction action)
         -- logstr (name ++ take 1 (show action))
         return ((),action)
 
@@ -336,9 +348,11 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
 
     where
 
-      output = do
-        samplePayoffs' <- samplePayoffs
-        averageUtilStrategy' <- averageUtilStrategy
+      output =
+        mapRIO (contramap (AsPlayer name)) $ do
+        glog Outputting
+        samplePayoffs' <- mapRIO (contramap SamplePayoffs) samplePayoffs
+        averageUtilStrategy' <- mapRIO (contramap AverageUtility) averageUtilStrategy
         return  Diagnostics{
             playerName = name
           , averageUtilStrategy = averageUtilStrategy'
@@ -356,19 +370,22 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
                              pure vs
             where
               -- Sample the average utility from a single action
+               sampleY :: ActionPD -> RIO (GLogFunc SamplePayoffsMsg) Double
                sampleY y = do
+                  glog (SampleAction y)
                   -- newline
                   -- logln (name ++ ": sampleY: " ++ show y)
                   -- indent
                   ls1 <- mapM (\i -> do -- newline
                                         -- logstr ("[" ++ printf "%3i" i ++ "]  ")
                                         -- indent
-                                        v <- u y
+                                        v <- mapRIO (contramap (SampleRootMsg i)) $ u y
                                         -- logstr (" => " ++ show v)
                                         -- deindent
                                         pure v) [1..sampleSize]
                   -- newline
                   let average =  (sum ls1 / fromIntegral sampleSize)
+                  glog (SampleAverageIs average)
                   -- newline
                   -- logstr ("average=" ++ show average)
 
@@ -377,6 +394,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
 
           -- Sample the average utility from current strategy
           averageUtilStrategy = do
+            glog StartingAverageUtil
             -- newline
             -- newline
             -- logstr "averageUtilStrategy"
@@ -385,7 +403,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
             -- newline
 
             -- logstr "h'["
-            (_,x) <- h
+            (_,x) <- mapRIO (contramap AverageRootMsg) h
             -- logstr "]"
             -- newline
             -- logstr ("x=" ++ show x)
@@ -397,7 +415,8 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
             -- newline
             -- newline
             actionLS' <- mapM (\i -> do
-                                        v <- action x gS
+                                        v <- mapRIO (contramap AverageRootMsg) $ action x gS
+                                        glog (AverageActionChosen v)
                                         -- logstr (take 1 (show v))
                                         pure v)
                              [1.. sampleSize]
@@ -409,7 +428,8 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
             utilLS  <- mapM (\(i,a) ->
                                    do -- newline
                                       -- logstr ("[" ++ printf "%3i %s" i (take 1 $ show a) ++ "] ")
-                                      v <- u a
+                                      glog (AverageIterAction i a)
+                                      v <- mapRIO (contramap AverageRootMsg) $ u a
                                       -- logstr (" => " ++ show v)
                                       pure v
                              )
@@ -421,6 +441,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
             -- newline
             let average = (sum utilLS / fromIntegral sampleSize)
             -- logstr ("average=" ++ show average)
+            glog (AverageComplete average)
             -- deindent
             -- newline
 
@@ -430,13 +451,15 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
                     genFromTable (runKleisli strat x) gS
 
           u y = do
+             glog UStart
              -- logstr "u["
              -- logstr "h["
-             (z,_) <- h
+             (z,_) <- mapRIO (contramap WithinU) h
              -- logstr "]"
              v <-
+              mapRIO (contramap CalledK) $
               evalStateT (do -- Trans.lift $ logstr "k["
-                             r <- k z y
+                             r <-  k z y
                              -- Trans.lift $ logstr "]"
                              mp <- gets id
                              -- Trans.lift $ case HM.lookup name mp of
@@ -445,6 +468,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
                              gets ((+ r) . HM.findWithDefault 0.0 name))
                           HM.empty
              -- logstr "]"
+             glog UEnd
              pure v
 -- Support functionality for constructing open games
 fromLens :: (x -> y) -> (x -> r -> s) -> IOOpenGame '[] '[] x s y r
@@ -525,28 +549,60 @@ printOutput
      -> (ActionPD, ActionPD)
      -> IO ()
 printOutput iterator strat initialAction = do
-  ref <- newIORef 0
-  runRIO Rdr{indentRef=ref} $ do
-  let resultIOs@(result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
-  traverseList_ (Proxy :: Proxy Show) (liftIO . print) resultIOs
-  pure ()
+  indentRef <- newIORef 0
+  runRIO (mkGLogFunc (logFuncStructured indentRef)) $ do
+    let resultIOs@(result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
+    traverseList_ (Proxy :: Proxy Show) (liftIO . print) resultIOs
+    pure ()
 
-  -- -- (stratUtil1,ys1) <- result1
-  -- diagnosticInfoIO1 <- result1
-  -- -- (stratUtil2,ys2) <- result2
-  -- diagnosticInfoIO2 <- result2
-  -- logln "player 1"
-  -- logln $ show diagnosticInfoIO1
-  -- logln "player 2"
-  -- logln $ show diagnosticInfoIO2
-  -- putStrLn "Other actions"
-  -- print ys1
-  -- putStrLn "Own util 2"
+logFuncTracing callStack msg = do
+  case getCallStack callStack of
+     [("glog", srcloc)] -> do
+       fp <- makeRelativeToCurrentDirectory (srcLocFile srcloc)
+       S8.putStrLn (S8.pack (show msg ++ " (" ++ prettySrcLoc (srcloc{srcLocFile=fp}) ++ ")"))
 
-  -- print stratUtil2
-  -- putStrLn "Other actions"
-  -- print ys2
-  pure ()
+data Readr = Readr { indentRef :: IORef Int }
+logFuncStructured indentRef _ msg = flip runReaderT Readr{indentRef} (go msg)
+
+  where
+
+   go = \case
+     AsPlayer player msg -> do
+       case msg of
+         Outputting -> pure ()
+         SamplePayoffs pmsg ->
+           case pmsg of
+             SampleAction action -> logln ("SampleY: " ++ take 1 (show action))
+             SampleRootMsg i msg -> do
+               case msg of
+                 UStart -> logstr "u["
+                 CalledK msg -> case msg of
+                   VChooseAction action -> logstr (take 1 (show action))
+                 UEnd -> do logstr "]"; newline
+                 _ -> pure ()
+             _ -> pure ()
+         _ -> pure ()
+     _ -> pure ()
+
+   logln :: String -> (ReaderT Readr IO) ()
+   logln s = do newline; logstr s; newline
+
+   logstr :: String -> (ReaderT Readr IO) ()
+   logstr s = liftIO $ S8.putStr (S8.pack s)
+
+   newline  :: ReaderT Readr IO ()
+   newline =
+      do Readr{indentRef} <- ask
+         liftIO $
+          do i <- readIORef indentRef
+             S8.putStr ("\n" <> S8.replicate i ' ')
+
+
+   indent :: ReaderT Readr IO ()
+   indent = (do Readr{indentRef} <- ask; liftIO $ modifyIORef' indentRef (+4))
+
+   deindent :: ReaderT Readr IO ()
+   deindent =  (do Readr{indentRef} <- ask; liftIO $ modifyIORef' indentRef (subtract 4))
 
 repeatedPDEq
   :: Integer
@@ -742,23 +798,3 @@ prisonersDilemmaMatrix Cooperate Cooperate   = 3
 prisonersDilemmaMatrix Cooperate Defect  = 0
 prisonersDilemmaMatrix Defect Cooperate  = 5
 prisonersDilemmaMatrix Defect Defect = 1
-
--- logln :: String -> (RIO Rdr) ()
--- logln s = do newline; logstr s; newline
-
--- logstr :: String -> (RIO Rdr) ()
--- logstr s = liftIO $ S8.putStr (S8.pack s)
-
--- newline  :: RIO Rdr ()
--- newline = RIO (
---    do Rdr{indentRef} <- ask
---       liftIO $
---        do i <- readIORef indentRef
---           S8.putStr ("\n" <> S8.replicate i ' ')
---  )
-
--- indent :: RIO Rdr ()
--- indent = RIO (do Rdr{indentRef} <- ask; liftIO $ modifyIORef' indentRef (+4))
-
--- deindent :: RIO Rdr ()
--- deindent = RIO (do Rdr{indentRef} <- ask; liftIO $ modifyIORef' indentRef (subtract 4))
