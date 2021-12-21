@@ -320,7 +320,7 @@ instance Context MonadContext MonadOptic where
 type IOOpenGame a b x s y r = OpenGame MonadOptic MonadContext a b x s y r
 
 dependentDecisionIO
-  :: forall x. Show x => String
+  :: forall x. (Show x, x ~ (ActionPD, ActionPD)) => String
   -> Int
   -> [ActionPD]
   -> IOOpenGame '[Kleisli CondensedTableV x ActionPD] '[(RIO Rdr) (Diagnostics ActionPD)] x () ActionPD Double
@@ -353,13 +353,19 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
       output =
         mapRIO (contramap (AsPlayer name)) $ do
         glog Outputting
-        samplePayoffs' <- mapRIO (contramap SamplePayoffs) samplePayoffs
-        averageUtilStrategy' <- mapRIO (contramap AverageUtility) averageUtilStrategy
+        zippedLs <- mapRIO (contramap SamplePayoffs) samplePayoffs
+        let samplePayoffs' = map snd zippedLs
+        let (optimalPlay, optimalPayoff) = maximumBy (comparing snd) zippedLs
+        (currentMove, averageUtilStrategy') <- mapRIO (contramap AverageUtility) averageUtilStrategy
+
+        -- diagnostics <- deviationsInContext name
         return  Diagnostics{
             playerName = name
           , averageUtilStrategy = averageUtilStrategy'
           , samplePayoffs = samplePayoffs'
-          , currentMove = 0
+          , currentMove = currentMove
+          , optimalMove = optimalPlay
+          , optimalPayoff
           }
 
         where
@@ -372,7 +378,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
                              pure vs
             where
               -- Sample the average utility from a single action
-               sampleY :: ActionPD -> RIO (GLogFunc SamplePayoffsMsg) Double
+               sampleY :: ActionPD -> RIO (GLogFunc SamplePayoffsMsg) (ActionPD, Double)
                sampleY y = do
                   glog (SampleAction y)
                   -- newline
@@ -392,7 +398,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
                   -- logstr ("average=" ++ show average)
 
                   -- deindent
-                  pure average
+                  pure (y, average)
 
           -- Sample the average utility from current strategy
           averageUtilStrategy = do
@@ -447,7 +453,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
             -- deindent
             -- newline
 
-            return average
+            return (x, average)
 
             where action x gS = do
                     genFromTable (runKleisli strat x) gS
@@ -523,7 +529,9 @@ data Diagnostics y = Diagnostics {
   playerName :: String
   , averageUtilStrategy :: Double
   , samplePayoffs :: [Double]
-  , currentMove :: Double
+  , currentMove :: (y,y)
+  , optimalMove :: y
+  , optimalPayoff :: Double
   }
   deriving (Show)
 
