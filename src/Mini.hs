@@ -552,10 +552,13 @@ printOutput
      -> IO ()
 printOutput iterator strat initialAction = do
   indentRef <- newIORef 0
-  runRIO (mkGLogFunc logFuncTracing) $ do
-    let resultIOs@(result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
+  runRIO (mkGLogFunc logFuncSilent) $ do
+    let resultIOs = repeatedPDEq iterator strat initialAction
     traverseList_ (Proxy :: Proxy Show) (liftIO . print) resultIOs
     pure ()
+
+logFuncSilent :: CallStack -> Msg -> IO ()
+logFuncSilent _ _ = pure ()
 
 -- ignore this one
 logFuncTracing _ (AsPlayer _ (SamplePayoffs (SampleRootMsg _ (CalledK {})))) = pure ()
