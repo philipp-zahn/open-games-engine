@@ -361,7 +361,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
         -- diagnostics <- deviationsInContext name
         return  Diagnostics{
             playerName = name
-          , averageUtilStrategy = averageUtilStrategy'
+          , averageUtilStrategy = averageUtilStrategy' -- equivalent to strategic payoff from Bayes version
           , samplePayoffs = samplePayoffs'
           , currentMove = currentMove
           , optimalMove = optimalPlay
