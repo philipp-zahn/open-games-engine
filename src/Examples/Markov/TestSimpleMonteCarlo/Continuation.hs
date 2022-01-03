@@ -1,3 +1,4 @@
+{-# language DataKinds, TypeOperators, GADTs, MultiParamTypeClasses, KindSignatures, FlexibleInstances, FlexibleContexts, TypeFamilies, FunctionalDependencies, UndecidableInstances, QuasiQuotes, NamedFieldPuns, PartialTypeSignatures, ScopedTypeVariables, GeneralizedNewtypeDeriving , OverloadedStrings, Rank2Types, ConstraintKinds, LambdaCase, RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -10,14 +11,54 @@ module Examples.Markov.TestSimpleMonteCarlo.Continuation
   , discountFactor
   ) where
 
+import           Control.Applicative ( Applicative(liftA2) )
+import           Control.Arrow ( Kleisli(runKleisli, Kleisli) )
+import           Control.Monad.Reader
+import           Control.Monad.State ( StateT(StateT), replicateM_ )
+import           Control.Monad.State ( StateT, replicateM, gets, modify, evalStateT )
+import qualified Control.Monad.State as ST
+    ( MonadState(put, get), MonadTrans(lift), StateT(runStateT) )
+import           Control.Monad.Trans.Class as Trans ( MonadTrans(lift) )
+import qualified Data.ByteString.Char8 as S8
+import           Data.Foldable
+import           Data.Functor.Contravariant
+import qualified Data.HashMap as HM ( empty, findWithDefault, Map, lookup )
+import           Data.IORef
+import           Data.Kind ( Type, Constraint )
+import           Data.List (maximumBy)
+import           Data.Ord
+import           Data.Proxy
+import           Data.Utils ( adjustOrAdd )
+import           Data.Utils ( average )
+import qualified Data.Vector as V ( fromList )
+import           Debug.Trace ()
+import           Engine.IOGames
+import           Engine.TLL (traverseList_)
+import           GHC.Stack
+import           Numeric.Probability.Distribution ( certainly )
+import           Numeric.Probability.Distribution ( fromFreqs, T(decons) )
+import           Preprocessor.Preprocessor ( opengame )
+import qualified RIO
+import           RIO (RIO, runRIO, GLogFunc, glog, mkGLogFunc, mapRIO)
+import           System.Directory
+import           System.IO.Unsafe ( unsafePerformIO )
+import           System.Random ( newStdGen )
+import           System.Random.MWC.CondensedTable
+    ( CondensedTableV, tableFromProbabilities )
+import           System.Random.MWC.CondensedTable ( genFromTable, CondensedTableV )
+import           System.Random.Stateful ( newIOGenM )
+import           Text.Printf
+
+
+
 import           Engine.Engine hiding (fromLens,Agent,fromFunctions,discount)
 import           Preprocessor.Preprocessor
 import           Examples.SimultaneousMoves (ActionPD(..),prisonersDilemmaMatrix)
 import           Engine.IOGames
 import           Data.Utils
 
-import           Control.Monad.State  hiding (state,void)
-import qualified Control.Monad.State  as ST
+import           Control.Monad.State hiding (state,void)
+import qualified Control.Monad.State as ST
 import qualified Data.Vector as V
 import           Debug.Trace
 import           System.IO.Unsafe
@@ -35,11 +76,11 @@ import           Numeric.Probability.Distribution hiding (map, lift, filter)
 discountFactor = 1.0
 
 prisonersDilemmaCont :: OpenGame
-                          MonadOptic
-                          MonadContext
+                          (MonadOptic (Msg ActionPD))
+                          (MonadContext (Msg ActionPD))
                           ('[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
                              Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD])
-                          ('[IO (Double,[Double]), IO (Double, [Double])])
+                          ('[RIO (GLogFunc (Msg ActionPD)) (Diagnostics (ActionPD, ActionPD) ActionPD), RIO (GLogFunc (Msg ActionPD)) (Diagnostics (ActionPD, ActionPD) ActionPD)])
                           (ActionPD, ActionPD)
                           ()
                           (ActionPD, ActionPD)
@@ -97,13 +138,13 @@ transformStratTuple (x ::- y ::- Nil) =
 
 
 -- extract continuation
-extractContinuation :: MonadOptic s () a () -> s -> StateT Vector IO ()
+extractContinuation :: MonadOptic (Msg ActionPD) s () a () -> s -> StateT Vector (RIO (GLogFunc (Msg ActionPD))) ()
 extractContinuation (MonadOptic v u) x = do
   (z,a) <- ST.lift (v x)
   u z ()
 
 -- extract next state (action)
-extractNextState :: MonadOptic s () a () -> s -> IO a
+extractNextState :: MonadOptic (Msg ActionPD) s () a () -> s -> RIO (GLogFunc (Msg ActionPD)) a
 extractNextState (MonadOptic v _) x = do
   (z,a) <- v x
   pure a
@@ -119,7 +160,7 @@ determineContinuationPayoffs :: Integer
                                       '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
                                         Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
                              -> (ActionPD,ActionPD)
-                             -> StateT Vector IO ()
+                             -> StateT Vector (RIO (GLogFunc (Msg ActionPD))) ()
 determineContinuationPayoffs 1        strat action = pure ()
 determineContinuationPayoffs iterator strat action = do
    extractContinuation executeStrat action
@@ -136,14 +177,14 @@ sampleDetermineContinuationPayoffs :: Int
                                             '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
                                               Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
                                   -> (ActionPD,ActionPD)
-                                  -> StateT Vector IO ()
+                                  -> StateT Vector (RIO (GLogFunc (Msg ActionPD))) ()
 sampleDetermineContinuationPayoffs sampleSize iterator strat initialValue = do
   replicateM_ sampleSize (determineContinuationPayoffs iterator strat initialValue)
   v <- ST.get
   ST.put (average sampleSize v)
 
 -- NOTE EVIL EVIL
-sampleDetermineContinuationPayoffsStoch :: Int
+sampleDetermineContinuationPayoffsStoch :: GLogFunc (Msg ActionPD) -> Int
                                   -- ^ Sample size
                                   -> Integer
                                   -- ^ How many rounds are explored?
@@ -152,14 +193,14 @@ sampleDetermineContinuationPayoffsStoch :: Int
                                               Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
                                   -> (ActionPD,ActionPD)
                                   -> StateT Vector Stochastic ()
-sampleDetermineContinuationPayoffsStoch sampleSize iterator strat initialValue = do
+sampleDetermineContinuationPayoffsStoch logfunc sampleSize iterator strat initialValue = do
    transformStateTIO $  sampleDetermineContinuationPayoffs sampleSize iterator strat initialValue
    where
-      transformStateTIO ::  StateT Vector IO () ->  StateT Vector Stochastic ()
+      transformStateTIO ::  StateT Vector (RIO (GLogFunc (Msg ActionPD))) () ->  StateT Vector Stochastic ()
       transformStateTIO sTT = StateT (\s -> unsafeTransformIO $  ST.runStateT sTT s)
-      unsafeTransformIO :: IO a -> Stochastic a
+      unsafeTransformIO :: RIO (GLogFunc (Msg ActionPD)) a -> Stochastic a
       unsafeTransformIO a =
-        let a' = unsafePerformIO a
+        let a' = unsafePerformIO (runRIO logfunc a)
             in certainly a'
 
 -----------------------------
@@ -170,7 +211,7 @@ determineContinuationPayoffsIO :: Integer
                                      [Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
                                      Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD]
                                -> (ActionPD,ActionPD)
-                               -> StateT Vector IO ()
+                               -> StateT Vector (RIO (GLogFunc (Msg ActionPD))) ()
 determineContinuationPayoffsIO 1        strat action = pure ()
 determineContinuationPayoffsIO iterator strat action = do
    extractContinuation executeStrat action
@@ -189,18 +230,32 @@ repeatedPDEq  iterator strat initialAction = evaluate prisonersDilemmaCont strat
   where context  = contextCont iterator strat initialAction
 
 
+-- printOutput iterator strat initialAction = do
+--   let (result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
+--   (stratUtil1,ys1) <- result1
+--   (stratUtil2,ys2) <- result2
+--   putStrLn "Own util 1"
+--   print stratUtil1
+--   putStrLn "Other actions"
+--   print ys1
+--   putStrLn "Own util 2"
+--   print stratUtil2
+--   putStrLn "Other actions"
+--   print ys2
+
+printOutput
+  :: Integer
+     -> List
+          '[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
+            Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD]
+     -> (ActionPD, ActionPD)
+     -> IO ()
 printOutput iterator strat initialAction = do
-  let (result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
-  (stratUtil1,ys1) <- result1
-  (stratUtil2,ys2) <- result2
-  putStrLn "Own util 1"
-  print stratUtil1
-  putStrLn "Other actions"
-  print ys1
-  putStrLn "Own util 2"
-  print stratUtil2
-  putStrLn "Other actions"
-  print ys2
+  indentRef <- newIORef 0
+  runRIO (mkGLogFunc logFuncSilent :: GLogFunc (Msg ActionPD)) $ do
+    let resultIOs = repeatedPDEq iterator strat initialAction
+    traverseList_ (Proxy :: Proxy Show) (liftIO . print) resultIOs
+    pure ()
 
 ----------------------------------------------------
 -- This is taken from the other MonteCarloTest setup

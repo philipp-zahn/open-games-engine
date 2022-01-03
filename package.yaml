@@ -64,6 +64,9 @@ dependencies:
     - vector
     - monad-bayes
     - criterion
+    - rio
+    - directory
+    - bytestring
 
 executables:
   open-games-exe:
