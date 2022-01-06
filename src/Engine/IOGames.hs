@@ -12,7 +12,6 @@
 module Engine.IOGames
   ( IOOpenGame(..)
   , Agent(..)
-  , DiagnosticInfoIO(..)
   , dependentDecisionIO
   , fromLens
   , fromFunctions
@@ -21,7 +20,7 @@ module Engine.IOGames
   , PlayerMsg(..)
   , SamplePayoffsMsg(..)
   , AverageUtilityMsg(..)
-  , Diagnostics
+  , DiagnosticsMC
   , logFuncSilent
   , logFuncTracing
   , logFuncStructured
@@ -79,10 +78,7 @@ data AverageUtilityMsg action = StartingAverageUtil | AverageRootMsg (Msg action
   deriving Show
 
 --------------------------------------------------------------------------------
-
-
--- TODO implement the sampler
--- TODO implement printout
+-- Basic types
 
 type IOOpenGame msg a b x s y r = OpenGame (MonadOptic msg) (MonadContext msg) a b x s y r
 
@@ -90,122 +86,13 @@ type Agent = String
 
 
 
-data DiagnosticInfoIO y = DiagnosticInfoIO
-  { playerIO          :: String
-  , optimalMoveIO     :: y
-  , optimalPayoffIO   :: Double
-  , currentMoveIO     :: y
-  , currentPayoffIO   :: Double}
-
-showDiagnosticInfoInteractive :: (Show y, Ord y) => DiagnosticInfoIO y -> String
-showDiagnosticInfoInteractive info =
-     "\n"    ++ "Player: " ++ playerIO info
-     ++ "\n" ++ "Optimal Move: " ++ (show $ optimalMoveIO info)
-     ++ "\n" ++ "Optimal Payoff: " ++ (show $ optimalPayoffIO info)
-     ++ "\n" ++ "Current Move: " ++ (show $ currentMoveIO info)
-     ++ "\n" ++ "Current Payoff: " ++ (show $ currentPayoffIO info)
-
-
-
--- output string information for a subgame expressions containing information from several players - bayesian
-showDiagnosticInfoLIO :: (Show y, Ord y)  => [DiagnosticInfoIO y] -> String
-showDiagnosticInfoLIO [] = "\n --No more information--"
-showDiagnosticInfoLIO (x:xs)  = showDiagnosticInfoInteractive x ++ "\n --other game-- " ++ showDiagnosticInfoLIO xs
-
-
-data PrintOutput = PrintOutput
-
-instance (Show y, Ord y) => Apply PrintOutput [DiagnosticInfoIO y] String where
-  apply _ x = showDiagnosticInfoLIO x
-
-
-data Concat = Concat
-
-instance Apply Concat String (String -> String) where
-  apply _ x = \y -> x ++ "\n NEWGAME: \n" ++ y
-
-
----------------------
--- main functionality
-
--- all information for all players
-generateOutputIO :: forall xs.
-               ( MapL   PrintOutput xs     (ConstMap String xs)
-               , FoldrL Concat String (ConstMap String xs)
-               ) => List xs -> IO ()
-generateOutputIO hlist = putStrLn $
-  "----Analytics begin----" ++ (foldrL Concat "" $ mapL @_ @_ @(ConstMap String xs) PrintOutput hlist) ++ "----Analytics end----\n"
-
-
-
-
-
-deviationsInContext :: (Show a, Ord a)
-                    =>  Agent -> a -> (a -> IO Double) -> [a] -> IO [DiagnosticInfoIO a]
-deviationsInContext name strategy u ys = do
-     ls              <- mapM u ys
-     strategicPayoff <- u strategy
-     let zippedLs    =  zip ys ls
-         (optimalPlay, optimalPayoff) = maximumBy (comparing snd) zippedLs
-     pure [ DiagnosticInfoIO
-            {  playerIO = name
-            , optimalMoveIO = optimalPlay
-            , optimalPayoffIO = optimalPayoff
-            , currentMoveIO   = strategy
-            , currentPayoffIO = strategicPayoff
-            }]
-
-
--- NOTE This ignores the state
-dependentDecisionIO_ :: (Eq x, Show x, Ord y, Show y) => String -> Int -> [y] ->  IOOpenGame msg '[Kleisli CondensedTableV x y] '[RIO (GLogFunc msg) (Double,[Double])] x () y Double
-          -- s t  a b
--- ^ (average utility of current strategy, [average utility of all possible alternative actions])
-dependentDecisionIO_ name sampleSize ys = OpenGame {
-  -- ^ ys is the list of possible actions
-  play = \(strat ::- Nil) -> let v x = do
-                                   g <- newStdGen
-                                   gS <- newIOGenM g
-                                   action <- genFromTable (runKleisli strat x) gS
-                                   return ((),action)
-                                 u () r = modify (adjustOrAdd (+ r) r name)
-                             in MonadOptic v u,
-  evaluate = \(strat ::- Nil) (MonadContext h k) -> do
-       let action = do
-              (_,x) <- h
-              g <- newStdGen
-              gS <- newIOGenM g
-              genFromTable (runKleisli strat x) gS
-           u y     = do
-              (z,_) <- h
-              evalStateT (do
-                             r <- k z y
-                           -- ^ utility <- payoff function given other players strategies and my own action y
-                             gets ((+ r) . HM.findWithDefault 0.0 name))
-                          HM.empty
-           -- Sample the average utility from current strategy
-           averageUtilStrategy = do
-             actionLS' <- replicateM sampleSize action
-             utilLS  <- mapM u actionLS'
-             return (sum utilLS / fromIntegral sampleSize)
-           -- Sample the average utility from a single action
-           sampleY sampleSize y = do
-                  ls1 <- replicateM sampleSize (u y)
-                  pure  (sum ls1 / fromIntegral sampleSize)
-           -- Sample the average utility from all actions
-           samplePayoffs sampleSize = mapM (sampleY sampleSize) ys
-           output = do
-             samplePayoffs' <- samplePayoffs sampleSize
-             averageUtilStrategy' <- averageUtilStrategy
-             return $ (averageUtilStrategy', samplePayoffs')
-              in (output ::- Nil) }
-
-data Diagnostics x y = Diagnostics {
-  playerName :: String
-  , averageUtilStrategy :: Double
-  , samplePayoffs :: [Double]
-  , currentMove :: x
-  , optimalMove :: y
-  , optimalPayoff :: Double
+data DiagnosticsMC x y = DiagnosticsMC {
+  playerNameMC :: String
+  , averageUtilStrategyMC :: Double
+  , samplePayoffsMC :: [Double]
+  , currentMoveMC :: x
+  , optimalMoveMC :: y
+  , optimalPayoffMC :: Double
   }
   deriving (Show)
 
@@ -213,14 +100,13 @@ dependentDecisionIO
   :: forall x action. (Show x) => String
   -> Int
   -> [action]
-  -> IOOpenGame (Msg action) '[Kleisli CondensedTableV x action] '[(RIO (Rdr action)) (Diagnostics x action)] x () action Double
+  -> IOOpenGame (Msg action) '[Kleisli CondensedTableV x action] '[(RIO (Rdr action)) (DiagnosticsMC x action)] x () action Double
 dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
 
   play :: List '[Kleisli CondensedTableV x action]
        -> MonadOptic (Msg action) x () action Double
   play (strat ::- Nil) =
     MonadOptic v u
-
     where
       v x = do
         g <- newStdGen
@@ -228,15 +114,13 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
         action <- genFromTable (runKleisli strat x) gS
         glog (VChooseAction action)
         return ((),action)
-
       u () r = modify (adjustOrAdd (+ r) r name)
 
   evaluate :: List '[Kleisli CondensedTableV x action]
            -> MonadContext (Msg action) x () action Double
-           -> List '[(RIO (Rdr action)) (Diagnostics x action)]
+           -> List '[(RIO (Rdr action)) (DiagnosticsMC x action)]
   evaluate (strat ::- Nil) (MonadContext h k) =
     output ::- Nil
-
     where
 
       output =
@@ -246,13 +130,13 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
         let samplePayoffs' = map snd zippedLs
         let (optimalPlay, optimalPayoff0) = maximumBy (comparing snd) zippedLs
         (currentMove, averageUtilStrategy') <- RIO.mapRIO (contramap AverageUtility) averageUtilStrategy
-        return  Diagnostics{
-            playerName = name
-          , averageUtilStrategy = averageUtilStrategy'
-          , samplePayoffs = samplePayoffs'
-          , currentMove = currentMove
-          , optimalMove = optimalPlay
-          , optimalPayoff = optimalPayoff0
+        return  DiagnosticsMC{
+            playerNameMC = name
+          , averageUtilStrategyMC = averageUtilStrategy'
+          , samplePayoffsMC = samplePayoffs'
+          , currentMoveMC = currentMove
+          , optimalMoveMC = optimalPlay
+          , optimalPayoffMC = optimalPayoff0
           }
 
         where

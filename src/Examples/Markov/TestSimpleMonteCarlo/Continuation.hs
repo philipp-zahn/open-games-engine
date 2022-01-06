@@ -80,7 +80,7 @@ prisonersDilemmaCont :: OpenGame
                           (MonadContext (Msg ActionPD))
                           ('[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
                              Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD])
-                          ('[RIO (GLogFunc (Msg ActionPD)) (Diagnostics (ActionPD, ActionPD) ActionPD), RIO (GLogFunc (Msg ActionPD)) (Diagnostics (ActionPD, ActionPD) ActionPD)])
+                          ('[RIO (GLogFunc (Msg ActionPD)) (DiagnosticsMC (ActionPD, ActionPD) ActionPD), RIO (GLogFunc (Msg ActionPD)) (DiagnosticsMC (ActionPD, ActionPD) ActionPD)])
                           (ActionPD, ActionPD)
                           ()
                           (ActionPD, ActionPD)
