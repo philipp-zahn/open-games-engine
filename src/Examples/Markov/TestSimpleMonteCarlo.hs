@@ -92,11 +92,11 @@ strategyTupleTest = stageStrategyTest ::- stageStrategyTest ::- Nil
 
 
 -- fix context used for the evaluation
-contextCont sampleSize iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> trace "cont" (sampleDetermineContinuationPayoffsStoch (RIO.mkGLogFunc logFuncSilent) sampleSize iterator strat action))
+contextCont sample1 sample2 sampleSize iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> sampleDetermineContinuationPayoffsStoch (RIO.mkGLogFunc logFuncSilent) sample1 sample2 sampleSize iterator strat action)
 
 
 
-repeatedPDEq sampleSize iterator strat initialAction = evaluate prisonersDilemma strat context
-  where context  = contextCont sampleSize iterator strat initialAction
+repeatedPDEq sample1 sample2 sampleSize iterator strat initialAction = evaluate prisonersDilemma strat context
+  where context  = contextCont sample1 sample2 sampleSize iterator strat initialAction
 
-eqOutput sampleSize iterator strat initialAction = generateIsEq $ repeatedPDEq sampleSize iterator strat initialAction
+eqOutput sample1 sample2 sampleSize iterator strat initialAction = generateIsEq $ repeatedPDEq sample1 sample2 sampleSize iterator strat initialAction

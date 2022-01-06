@@ -22,7 +22,7 @@ import Engine.TLL
 
 --------------------------------------------------------
 -- Diagnosticinformation and processesing of information
--- for standard game-theoretic analysis
+-- for standard Bayesian game-theoretic analysis
 
 -- Defining the necessary types for outputting information of a BayesianGame
 data DiagnosticInfoBayesian x y = DiagnosticInfoBayesian
@@ -39,7 +39,7 @@ data DiagnosticInfoBayesian x y = DiagnosticInfoBayesian
 
 -- prepare string information for Bayesian game
 showDiagnosticInfo :: (Show y, Ord y, Show x) => DiagnosticInfoBayesian x y -> String
-showDiagnosticInfo info =  
+showDiagnosticInfo info =
      "\n"    ++ "Player: " ++ player info
      ++ "\n" ++ "Optimal Move: " ++ (show $ optimalMove info)
      ++ "\n" ++ "Current Strategy: " ++ (show $ strategy info)
@@ -50,10 +50,10 @@ showDiagnosticInfo info =
 
 
 
--- output string information for a subgame expressions containing information from several players - bayesian 
+-- output string information for a subgame expressions containing information from several players - bayesian
 showDiagnosticInfoL :: (Show y, Ord y, Show x) => [DiagnosticInfoBayesian x y] -> String
 showDiagnosticInfoL [] = "\n --No more information--"
-showDiagnosticInfoL (x:xs)  = showDiagnosticInfo x ++ "\n --other game-- " ++ showDiagnosticInfoL xs 
+showDiagnosticInfoL (x:xs)  = showDiagnosticInfo x ++ "\n --other game-- " ++ showDiagnosticInfoL xs
 
 -- checks equilibrium and if not outputs relevant deviations
 checkEqL :: (Show y, Ord y, Show x) => [DiagnosticInfoBayesian x y] -> String
@@ -109,4 +109,3 @@ generateIsEq :: forall xs.
                ) => List xs -> IO ()
 generateIsEq hlist = putStrLn $
   "----Analytics begin----" ++ (foldrL Concat "" $ mapL @_ @_ @(ConstMap String xs) PrintIsEq hlist) ++ "----Analytics end----\n"
-

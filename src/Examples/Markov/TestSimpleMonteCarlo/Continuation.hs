@@ -67,15 +67,24 @@ import           System.Random
 import           System.Random.Stateful
 import           Numeric.Probability.Distribution hiding (map, lift, filter)
 
-
 ---------------------------------------------
 -- Contains a first, very, very shaky version
 -- that does Monte Carlo through the evaluate
 ---------------------------------------------
 
-discountFactor = 1.0
+---------------------------------------------
+-- Types and parameters
 
-prisonersDilemmaCont :: OpenGame
+type SampleSize = Int
+
+
+discountFactor = 1.0
+---------------------------------------------
+-- Game definition
+
+prisonersDilemmaCont :: SampleSize
+                     -> SampleSize
+                     -> OpenGame
                           (MonadOptic (Msg ActionPD))
                           (MonadContext (Msg ActionPD))
                           ('[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
@@ -86,7 +95,7 @@ prisonersDilemmaCont :: OpenGame
                           (ActionPD, ActionPD)
                           ()
 
-prisonersDilemmaCont = [opengame|
+prisonersDilemmaCont sample1 sample2 = [opengame|
 
    inputs    : (dec1Old,dec2Old) ;
    feedback  :      ;
@@ -94,13 +103,13 @@ prisonersDilemmaCont = [opengame|
    :----------------------------:
    inputs    :  (dec1Old,dec2Old)    ;
    feedback  :      ;
-   operation : dependentDecisionIO "player1" 100 [Cooperate,Defect];
+   operation : dependentDecisionIO "player1" sample1 [Cooperate,Defect];
    outputs   : decisionPlayer1 ;
    returns   : prisonersDilemmaMatrix decisionPlayer1 decisionPlayer2 ;
 
    inputs    :   (dec1Old,dec2Old)   ;
    feedback  :      ;
-   operation : dependentDecisionIO "player2" 100 [Cooperate,Defect];
+   operation : dependentDecisionIO "player2" sample2 [Cooperate,Defect];
    outputs   : decisionPlayer2 ;
    returns   : prisonersDilemmaMatrix decisionPlayer2 decisionPlayer1 ;
 
@@ -114,7 +123,7 @@ prisonersDilemmaCont = [opengame|
    returns   :      ;
   |]
 
-
+-- Transform a strategy defined in _Stochastic_ into a probability table
 transformStrat :: Kleisli Stochastic x y -> Kleisli CondensedTableV x y
 transformStrat strat = Kleisli (\x ->
   let y = runKleisli strat x
@@ -122,7 +131,7 @@ transformStrat strat = Kleisli (\x ->
       v = V.fromList ls
       in tableFromProbabilities v)
 
-
+-- Transform the strategy tuple from _Stochastic_ into a probability table
 transformStratTuple :: List
                         '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
                           Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
@@ -133,8 +142,6 @@ transformStratTuple (x ::- y ::- Nil) =
   transformStrat x
   ::- transformStrat y
   ::- Nil
-
-
 
 
 -- extract continuation
@@ -149,52 +156,65 @@ extractNextState (MonadOptic v _) x = do
   (z,a) <- v x
   pure a
 
-executeStrat strat =  play prisonersDilemmaCont strat
+executeStrat sample1 sample2 strat =  play (prisonersDilemmaCont sample1 sample2) strat
 
---------------------------------
+----------------------------------------------------------------------------------------------
 -- This is for the mixed setting
 -- which includes the Bayesian setup
 -- determine continuation for iterator, with the same repeated strategy
-determineContinuationPayoffs :: Integer
+-- NOTE this ignores the sample information given in the game definition as it samples only the
+-- play independently
+determineContinuationPayoffs :: Int
+                             -> Int
+                             -> Integer
                              -> List
                                       '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
                                         Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
                              -> (ActionPD,ActionPD)
                              -> StateT Vector (RIO (GLogFunc (Msg ActionPD))) ()
-determineContinuationPayoffs 1        strat action = pure ()
-determineContinuationPayoffs iterator strat action = do
+determineContinuationPayoffs _ _ 1        strat action = pure ()
+determineContinuationPayoffs sample1 sample2 iterator strat action = do
    extractContinuation executeStrat action
    nextInput <- ST.lift $ extractNextState executeStrat action
-   determineContinuationPayoffs (pred iterator) strat nextInput
- where executeStrat =  play prisonersDilemmaCont (transformStratTuple strat)
+   determineContinuationPayoffs sample1 sample2 (pred iterator) strat nextInput
+ where executeStrat =  play (prisonersDilemmaCont sample1 sample2) (transformStratTuple strat)
 
 
 sampleDetermineContinuationPayoffs :: Int
-                                  -- ^ Sample size
-                                  -> Integer
-                                  -- ^ How many rounds are explored?
-                                  -> List
-                                            '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
-                                              Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
-                                  -> (ActionPD,ActionPD)
-                                  -> StateT Vector (RIO (GLogFunc (Msg ActionPD))) ()
-sampleDetermineContinuationPayoffs sampleSize iterator strat initialValue = do
-  replicateM_ sampleSize (determineContinuationPayoffs iterator strat initialValue)
+                                   -- ^ Sample for player 1 - here ignored
+                                   -> Int
+                                   -- ^ Sample for player 2 - here ignored
+                                   ->  Int
+                                   -- ^ Sample size
+                                   -> Integer
+                                   -- ^ How many rounds are explored?
+                                   -> List
+                                             '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
+                                               Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
+                                   -> (ActionPD,ActionPD)
+                                   -> StateT Vector (RIO (GLogFunc (Msg ActionPD))) ()
+sampleDetermineContinuationPayoffs sample1 sample2 sampleSize iterator strat initialValue = do
+  replicateM_ sampleSize (determineContinuationPayoffs sample1 sample2 iterator strat initialValue)
   v <- ST.get
   ST.put (average sampleSize v)
 
 -- NOTE EVIL EVIL
-sampleDetermineContinuationPayoffsStoch :: GLogFunc (Msg ActionPD) -> Int
-                                  -- ^ Sample size
-                                  -> Integer
-                                  -- ^ How many rounds are explored?
-                                  -> List
-                                            '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
-                                              Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
-                                  -> (ActionPD,ActionPD)
-                                  -> StateT Vector Stochastic ()
-sampleDetermineContinuationPayoffsStoch logfunc sampleSize iterator strat initialValue = do
-   transformStateTIO $  sampleDetermineContinuationPayoffs sampleSize iterator strat initialValue
+sampleDetermineContinuationPayoffsStoch :: GLogFunc (Msg ActionPD)
+                                        -> Int
+                                        -- ^ Sample size for player 1
+                                        -> Int
+                                        -- ^ Sample size for player 2
+                                        -> Int
+                                        -- ^ Sample size
+                                        -> Integer
+                                        -- ^ How many rounds are explored?
+                                        -> List
+                                                  '[Kleisli Stochastic (ActionPD, ActionPD) ActionPD,
+                                                    Kleisli Stochastic (ActionPD, ActionPD) ActionPD]
+                                        -> (ActionPD,ActionPD)
+                                        -> StateT Vector Stochastic ()
+sampleDetermineContinuationPayoffsStoch logfunc sample1 sample2 sampleSize iterator strat initialValue = do
+   transformStateTIO $  sampleDetermineContinuationPayoffs sample1 sample2 sampleSize iterator strat initialValue
    where
       transformStateTIO ::  StateT Vector (RIO (GLogFunc (Msg ActionPD))) () ->  StateT Vector Stochastic ()
       transformStateTIO sTT = StateT (\s -> unsafeTransformIO $  ST.runStateT sTT s)
@@ -206,59 +226,50 @@ sampleDetermineContinuationPayoffsStoch logfunc sampleSize iterator strat initia
 -----------------------------
 -- For IO only
 -- determine continuation for iterator, with the same repeated strategy
-determineContinuationPayoffsIO :: Integer
+determineContinuationPayoffsIO :: Int
+                               -- ^ Sample size for player 1
+                               -> Int
+                               -- ^ Sample size for player 2
+                               -> Integer
                                -> List
                                      [Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
                                      Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD]
                                -> (ActionPD,ActionPD)
                                -> StateT Vector (RIO (GLogFunc (Msg ActionPD))) ()
-determineContinuationPayoffsIO 1        strat action = pure ()
-determineContinuationPayoffsIO iterator strat action = do
+determineContinuationPayoffsIO _ _ 1        strat action = pure ()
+determineContinuationPayoffsIO sample1 sample2 iterator strat action = do
    extractContinuation executeStrat action
    nextInput <- ST.lift $ extractNextState executeStrat action
-   determineContinuationPayoffsIO (pred iterator) strat nextInput
- where executeStrat =  play prisonersDilemmaCont strat
-
-
+   determineContinuationPayoffsIO sample1 sample2 (pred iterator) strat nextInput
+ where executeStrat =  play (prisonersDilemmaCont sample1 sample2) strat
 
 -- fix context used for the evaluation
-contextCont  iterator strat initialAction = MonadContext (pure ((),initialAction)) (\_ action -> determineContinuationPayoffsIO iterator strat action)
+contextCont sample1 sample2 iterator strat initialAction = MonadContext (pure ((),initialAction)) (\_ action -> determineContinuationPayoffsIO sample1 sample2 iterator strat action)
 
+-- eq definition
+repeatedPDEq sample1 sample2 iterator strat initialAction = evaluate (prisonersDilemmaCont sample1 sample2) strat context
+  where context  = contextCont sample1 sample2 iterator strat initialAction
 
-
-repeatedPDEq  iterator strat initialAction = evaluate prisonersDilemmaCont strat context
-  where context  = contextCont iterator strat initialAction
-
-
--- printOutput iterator strat initialAction = do
---   let (result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
---   (stratUtil1,ys1) <- result1
---   (stratUtil2,ys2) <- result2
---   putStrLn "Own util 1"
---   print stratUtil1
---   putStrLn "Other actions"
---   print ys1
---   putStrLn "Own util 2"
---   print stratUtil2
---   putStrLn "Other actions"
---   print ys2
-
-printOutput
-  :: Integer
-     -> List
-          '[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
-            Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD]
-     -> (ActionPD, ActionPD)
-     -> IO ()
-printOutput iterator strat initialAction = do
+-- Prints the information using the logging
+printOutput :: Int
+            -- ^ Sample size for player 1
+            -> Int
+            -- ^ Sample size for player 2
+            -> Integer
+            -> List
+                  '[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
+                    Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD]
+            -> (ActionPD, ActionPD)
+            -> IO ()
+printOutput sample1 sample2 iterator strat initialAction = do
   indentRef <- newIORef 0
   runRIO (mkGLogFunc logFuncSilent :: GLogFunc (Msg ActionPD)) $ do
-    let resultIOs = repeatedPDEq iterator strat initialAction
+    let resultIOs = repeatedPDEq sample1 sample2 iterator strat initialAction
     traverseList_ (Proxy :: Proxy Show) (liftIO . print) resultIOs
     pure ()
 
 ----------------------------------------------------
--- This is taken from the other MonteCarloTest setup
+-- Equilibrium analysis
 -- Needs to be transformed in order to be tested
 
 -- Add strategy for stage game
@@ -279,7 +290,7 @@ strategyTupleTest = stageStrategyTest ::- stageStrategyTest ::- Nil
 
 -- Example usage:
 {--
-printOutput 20 (transformStratTuple strategyTupleTest) (Cooperate,Cooperate)
+printOutput 100 100  20 (transformStratTuple strategyTupleTest) (Cooperate,Cooperate)
 Own util 1
 45.296
 Other actions
