@@ -8,6 +8,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Engine.IOGames
   ( IOOpenGame(..)
@@ -84,13 +85,10 @@ type IOOpenGame msg a b x s y r = OpenGame (MonadOptic msg) (MonadContext msg) a
 
 type Agent = String
 
-
-
-data DiagnosticsMC x y = DiagnosticsMC {
+data DiagnosticsMC y = DiagnosticsMC {
   playerNameMC :: String
   , averageUtilStrategyMC :: Double
   , samplePayoffsMC :: [Double]
-  , currentMoveMC :: x
   , optimalMoveMC :: y
   , optimalPayoffMC :: Double
   }
@@ -100,7 +98,7 @@ dependentDecisionIO
   :: forall x action. (Show x) => String
   -> Int
   -> [action]
-  -> IOOpenGame (Msg action) '[Kleisli CondensedTableV x action] '[(RIO (Rdr action)) (DiagnosticsMC x action)] x () action Double
+  -> IOOpenGame (Msg action) '[Kleisli CondensedTableV x action] '[(RIO (Rdr action)) (DiagnosticsMC action)] x () action Double
 dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
 
   play :: List '[Kleisli CondensedTableV x action]
@@ -118,7 +116,7 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
 
   evaluate :: List '[Kleisli CondensedTableV x action]
            -> MonadContext (Msg action) x () action Double
-           -> List '[(RIO (Rdr action)) (DiagnosticsMC x action)]
+           -> List '[(RIO (Rdr action)) (DiagnosticsMC action)]
   evaluate (strat ::- Nil) (MonadContext h k) =
     output ::- Nil
     where
@@ -134,7 +132,6 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
             playerNameMC = name
           , averageUtilStrategyMC = averageUtilStrategy'
           , samplePayoffsMC = samplePayoffs'
-          , currentMoveMC = currentMove
           , optimalMoveMC = optimalPlay
           , optimalPayoffMC = optimalPayoff0
           }
@@ -174,7 +171,6 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
             let average = (sum utilLS / fromIntegral sampleSize)
             glog (AverageComplete average)
             return (x, average)
-
             where action x gS = do
                     genFromTable (runKleisli strat x) gS
 

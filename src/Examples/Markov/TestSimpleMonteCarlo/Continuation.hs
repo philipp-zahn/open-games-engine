@@ -89,7 +89,7 @@ prisonersDilemmaCont :: SampleSize
                           (MonadContext (Msg ActionPD))
                           ('[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
                              Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD])
-                          ('[RIO (GLogFunc (Msg ActionPD)) (DiagnosticsMC (ActionPD, ActionPD) ActionPD), RIO (GLogFunc (Msg ActionPD)) (DiagnosticsMC (ActionPD, ActionPD) ActionPD)])
+                          ('[RIO (GLogFunc (Msg ActionPD)) (DiagnosticsMC ActionPD), RIO (GLogFunc (Msg ActionPD)) (DiagnosticsMC ActionPD)])
                           (ActionPD, ActionPD)
                           ()
                           (ActionPD, ActionPD)
