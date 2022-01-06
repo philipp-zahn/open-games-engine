@@ -21,11 +21,13 @@ module Engine.OpticClass
   ) where
 
 
-import           Control.Monad.State                hiding (state)
-import           Data.HashMap                       as HM hiding (null,map,mapMaybe)
+import           Control.Monad.State hiding (state)
+import           Data.HashMap as HM hiding (null,map,mapMaybe)
 import           Data.Maybe
 import qualified Data.Vector as V
-import           Numeric.Probability.Distribution   hiding (lift)
+import           Numeric.Probability.Distribution hiding (lift)
+import qualified RIO
+import           RIO (RIO, glog, GLogFunc, HasGLogFunc(..))
 import           System.Random.MWC.CondensedTable
 import           System.Random.Stateful
 
@@ -170,12 +172,12 @@ instance ContextAdd StochasticContext where
 -- Experimental non Stochastic
 -- Same as used in learning implementation
 -- Can be used for IO as well
-data MonadOptic s t a b where
-  MonadOptic :: (s -> IO (z, a))
-                          -> (z -> b -> StateT Vector IO t)
-                          -> MonadOptic s t a b
+data MonadOptic msg s t a b where
+  MonadOptic :: (s -> (RIO (GLogFunc msg)) (z, a))
+                          -> (z -> b -> StateT Vector (RIO (GLogFunc msg)) t)
+                          -> MonadOptic msg s t a b
 
-instance Optic MonadOptic where
+instance Optic (MonadOptic msg) where
   lens v u = MonadOptic (\s -> return (s, v s)) (\s b -> return (u s b))
   (>>>>) (MonadOptic v1 u1) (MonadOptic v2 u2) = MonadOptic v u
     where v s = do {(z1, a) <- v1 s; (z2, p) <- v2 a; return ((z1, z2), p)}
@@ -189,13 +191,13 @@ instance Optic MonadOptic where
           u (Left z1) b  = u1 z1 b
           u (Right z2) b = u2 z2 b
 
-data MonadContext s t a b where
-  MonadContext :: (Show z) => IO (z, s) -> (z -> a -> StateT Vector IO b) -> MonadContext s t a b
+data MonadContext msg s t a b where
+  MonadContext :: (Show z) => (RIO (GLogFunc msg)) (z, s) -> (z -> a -> StateT Vector (RIO (GLogFunc msg)) b) -> MonadContext msg s t a b
 
-instance Precontext MonadContext where
+instance Precontext (MonadContext msg) where
   void = MonadContext (return ((), ())) (\() () -> return ())
 
-instance Context MonadContext MonadOptic where
+instance Context (MonadContext msg) (MonadOptic msg) where
   cmap (MonadOptic v1 u1) (MonadOptic v2 u2) (MonadContext h k)
             = let h' = do {(z, s) <- h; (_, s') <- v1 s; return (z, s')}
                   k' z a = do {(z', a') <- lift (v2 a); b' <- k z a'; u2 z' b'}

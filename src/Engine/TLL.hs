@@ -1,3 +1,4 @@
+{-# language ConstraintKinds, RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -25,9 +26,11 @@ module Engine.TLL
   , IndexList(..)
   , type (+:+)
   , (+:+)
+  , traverseList_
   ) where
 
 import Control.Applicative
+import Data.Proxy
 import Data.Kind
 
 infixr 6 ::-
@@ -148,3 +151,24 @@ type family LastL xs where
 lastL :: List a -> LastL a
 lastL (x ::- Nil)          = x
 lastL (x ::- xs@(_ ::- _)) = lastL xs
+
+--------------------------------------------------------------------------------
+-- traverse_
+
+class Monad m => TraverseList_ (ctx :: * -> Constraint) m a where
+  traverseList_
+    :: Proxy ctx
+     -> (forall x. ctx x => x -> m ())
+    -> List a
+    -> m ()
+
+instance Monad m => TraverseList_ ctx m '[] where
+  traverseList_ _proxy _f _ = pure ()
+
+instance (ctx a, Monad m, TraverseList_ ctx m as)
+       => TraverseList_ ctx m (m a ': as) where
+  traverseList_ proxy f (a ::- b) = do
+    x <- a
+    f x
+    xs <- traverseList_ proxy f b
+    pure ()

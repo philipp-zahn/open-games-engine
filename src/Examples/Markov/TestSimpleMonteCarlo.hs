@@ -8,12 +8,15 @@
 module Examples.Markov.TestSimpleMonteCarlo where
 
 import           Engine.Engine
-import           Preprocessor.Preprocessor
-import           Examples.SimultaneousMoves (ActionPD(..),prisonersDilemmaMatrix)
+import           Engine.IOGames (logFuncSilent)
 import           Examples.Markov.TestSimpleMonteCarlo.Continuation
+import           Examples.SimultaneousMoves (ActionPD(..),prisonersDilemmaMatrix)
+import           Preprocessor.Preprocessor
+import qualified RIO
+import           RIO (RIO, glog, GLogFunc, HasGLogFunc(..))
 
-import           Control.Monad.State  hiding (state,void)
-import qualified Control.Monad.State  as ST
+import           Control.Monad.State hiding (state,void)
+import qualified Control.Monad.State as ST
 import qualified Data.Vector as V
 import           Debug.Trace
 import           System.Random.MWC.CondensedTable
@@ -89,11 +92,11 @@ strategyTupleTest = stageStrategyTest ::- stageStrategyTest ::- Nil
 
 
 -- fix context used for the evaluation
-contextCont sampleSize iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> trace "cont" (sampleDetermineContinuationPayoffsStoch sampleSize iterator strat action))
+contextCont sample1 sample2 sampleSize iterator strat initialAction = StochasticStatefulContext (pure ((),initialAction)) (\_ action -> sampleDetermineContinuationPayoffsStoch (RIO.mkGLogFunc logFuncSilent) sample1 sample2 sampleSize iterator strat action)
 
 
 
-repeatedPDEq sampleSize iterator strat initialAction = evaluate prisonersDilemma strat context
-  where context  = contextCont sampleSize iterator strat initialAction
+repeatedPDEq sample1 sample2 sampleSize iterator strat initialAction = evaluate prisonersDilemma strat context
+  where context  = contextCont sample1 sample2 sampleSize iterator strat initialAction
 
-eqOutput sampleSize iterator strat initialAction = generateIsEq $ repeatedPDEq sampleSize iterator strat initialAction
+eqOutput sample1 sample2 sampleSize iterator strat initialAction = generateIsEq $ repeatedPDEq sample1 sample2 sampleSize iterator strat initialAction
