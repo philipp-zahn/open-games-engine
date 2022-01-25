@@ -8,14 +8,16 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Engine.IOGames
   ( IOOpenGame(..)
   , Agent(..)
+  , DiagnosticsMC(..)
   , dependentDecisionIO
   , fromLens
   , fromFunctions
+  , nature
   , discount
   , Msg(..)
   , PlayerMsg(..)
@@ -64,26 +66,12 @@ import           Engine.Diagnostics
 --------------------------------------------------------------------------------
 -- Messaging
 
-type Rdr action = GLogFunc (Msg action)
+-- TODO implement printout
 
-data Msg action = AsPlayer String (PlayerMsg action) | UStart | UEnd | WithinU (Msg action) | CalledK (Msg action) | VChooseAction action
-  deriving Show
-
-data PlayerMsg action = Outputting | SamplePayoffs (SamplePayoffsMsg action) | AverageUtility (AverageUtilityMsg action)
-  deriving Show
-
-data SamplePayoffsMsg action = SampleAction action | SampleRootMsg Int (Msg action) | SampleAverageIs Double
-  deriving Show
-
-data AverageUtilityMsg action = StartingAverageUtil | AverageRootMsg (Msg action) | AverageActionChosen action | AverageIterAction Int action | AverageComplete Double
-  deriving Show
-
---------------------------------------------------------------------------------
--- Basic types
-
-type IOOpenGame msg a b x s y r = OpenGame (MonadOptic msg) (MonadContext msg) a b x s y r
+type IOOpenGame a b x s y r = OpenGame MonadOptic MonadContext a b x s y r
 
 type Agent = String
+
 
 data DiagnosticsMC y = DiagnosticsMC {
   playerNameMC :: String
@@ -94,40 +82,30 @@ data DiagnosticsMC y = DiagnosticsMC {
   }
   deriving (Show)
 
-dependentDecisionIO
-  :: forall x action. (Show x) => String
-  -> Int
-  -> [action]
-  -> IOOpenGame (Msg action) '[Kleisli CondensedTableV x action] '[(RIO (Rdr action)) (DiagnosticsMC action)] x () action Double
+-- NOTE This ignores the state
+dependentDecisionIO :: (Eq x, Show x, Ord y, Show y) => String -> Int -> [y] ->  IOOpenGame '[Kleisli CondensedTableV x y] '[IO (DiagnosticsMC y)] x () y Double
+          -- s t  a b
+-- ^ (average utility of current strategy, [average utility of all possible alternative actions])
 dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
+  -- ^ ys is the list of possible actions
+  play = \(strat ::- Nil) -> let v x = do
+                                   g <- newStdGen
+                                   gS <- newIOGenM g
+                                   action <- genFromTable (runKleisli strat x) gS
+                                   return ((),action)
+                                 u () r = modify (adjustOrAdd (+ r) r name)
+                             in MonadOptic v u
 
-  play :: List '[Kleisli CondensedTableV x action]
-       -> MonadOptic (Msg action) x () action Double
-  play (strat ::- Nil) =
-    MonadOptic v u
-    where
-      v x = do
-        g <- newStdGen
-        gS <- newIOGenM g
-        action <- genFromTable (runKleisli strat x) gS
-        glog (VChooseAction action)
-        return ((),action)
-      u () r = modify (adjustOrAdd (+ r) r name)
-
-  evaluate :: List '[Kleisli CondensedTableV x action]
-           -> MonadContext (Msg action) x () action Double
-           -> List '[(RIO (Rdr action)) (DiagnosticsMC action)]
   evaluate (strat ::- Nil) (MonadContext h k) =
     output ::- Nil
+
     where
 
-      output =
-        RIO.mapRIO (contramap (AsPlayer name)) $ do
-        glog Outputting
-        zippedLs <- RIO.mapRIO (contramap SamplePayoffs) samplePayoffs
+      output = do
+        zippedLs <- samplePayoffs
         let samplePayoffs' = map snd zippedLs
         let (optimalPlay, optimalPayoff0) = maximumBy (comparing snd) zippedLs
-        (currentMove, averageUtilStrategy') <- RIO.mapRIO (contramap AverageUtility) averageUtilStrategy
+        (currentMove, averageUtilStrategy') <- averageUtilStrategy
         return  DiagnosticsMC{
             playerNameMC = name
           , averageUtilStrategyMC = averageUtilStrategy'
@@ -137,54 +115,34 @@ dependentDecisionIO name sampleSize ys = OpenGame { play, evaluate} where
           }
 
         where
-          -- Sample the average utility from all actions
-          samplePayoffs = do vs <- mapM sampleY ys
-                             pure vs
-            where
-              -- Sample the average utility from a single action
-               sampleY :: action -> RIO (GLogFunc (SamplePayoffsMsg action)) (action, Double)
-               sampleY y = do
-                  glog (SampleAction y)
-                  ls1 <- mapM (\i -> do v <- RIO.mapRIO (contramap (SampleRootMsg i)) $ u y
-                                        pure v) [1..sampleSize]
-                  let average =  (sum ls1 / fromIntegral sampleSize)
-                  glog (SampleAverageIs average)
-                  pure (y, average)
-
-          -- Sample the average utility from current strategy
-          averageUtilStrategy = do
-            glog StartingAverageUtil
-            (_,x) <- RIO.mapRIO (contramap AverageRootMsg) h
-            g <- newStdGen
-            gS <- newIOGenM g
-            actionLS' <- mapM (\i -> do
-                                        v <- RIO.mapRIO (contramap AverageRootMsg) $ action x gS
-                                        glog (AverageActionChosen v)
-                                        pure v)
-                             [1.. sampleSize]
-            utilLS  <- mapM (\(i,a) ->
-                                   do glog (AverageIterAction i a)
-                                      v <- RIO.mapRIO (contramap AverageRootMsg) $ u a
-                                      pure v
-                             )
-                        (zip [1 :: Int ..] actionLS')
-            let average = (sum utilLS / fromIntegral sampleSize)
-            glog (AverageComplete average)
-            return (x, average)
-            where action x gS = do
-                    genFromTable (runKleisli strat x) gS
-
-          u y = do
-             glog UStart
-             (z,_) <- RIO.mapRIO (contramap WithinU) h
-             v <-
-              RIO.mapRIO (contramap CalledK) $
-              evalStateT (do r <-  k z y
-                             mp <- gets id
+           action = do
+              (_,x) <- h
+              g <- newStdGen
+              gS <- newIOGenM g
+              genFromTable (runKleisli strat x) gS
+           u y     = do
+              (z,_) <- h
+              evalStateT (do
+                             r <- k z y
+                           -- ^ utility <- payoff function given other players strategies and my own action y
                              gets ((+ r) . HM.findWithDefault 0.0 name))
                           HM.empty
-             glog UEnd
-             pure v
+           -- Sample the average utility from current strategy
+           averageUtilStrategy = do
+             (_,x) <- h
+             actionLS' <- replicateM sampleSize action
+             utilLS  <- mapM u actionLS'
+             let average = (sum utilLS / fromIntegral sampleSize)
+             return (x,average)
+           -- Sample the average utility from a single action
+           sampleY y = do
+                  ls1 <- replicateM sampleSize (u y)
+                  let average =  (sum ls1 / fromIntegral sampleSize)
+                  pure (y, average)
+           -- Sample the average utility from all actions
+           samplePayoffs  = mapM sampleY ys
+
+
 
 -- Support functionality for constructing open games
 fromLens :: (x -> y) -> (x -> r -> s) -> IOOpenGame msg '[] '[] x s y r
@@ -195,6 +153,20 @@ fromLens v u = OpenGame {
 
 fromFunctions :: (x -> y) -> (r -> s) -> IOOpenGame msg '[] '[] x s y r
 fromFunctions f g = fromLens f (const g)
+
+nature :: CondensedTableV x -> IOOpenGame  '[] '[] () () x ()
+nature table = OpenGame { play, evaluate} where
+  play _ =
+    MonadOptic v u
+    where
+      v () = do
+        g <- newStdGen
+        gS <- newIOGenM g
+        draw <- genFromTable table gS
+        return ((),draw)
+      u _ _ = return ()
+
+  evaluate = \_ _ -> Nil
 
 
 

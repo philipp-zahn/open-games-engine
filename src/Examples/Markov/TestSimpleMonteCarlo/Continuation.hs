@@ -89,7 +89,7 @@ prisonersDilemmaCont :: SampleSize
                           (MonadContext (Msg ActionPD))
                           ('[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
                              Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD])
-                          ('[RIO (GLogFunc (Msg ActionPD)) (DiagnosticsMC ActionPD), RIO (GLogFunc (Msg ActionPD)) (DiagnosticsMC ActionPD)])
+                          ('[IO (DiagnosticsMC ActionPD), IO (DiagnosticsMC ActionPD)])
                           (ActionPD, ActionPD)
                           ()
                           (ActionPD, ActionPD)
@@ -244,29 +244,22 @@ determineContinuationPayoffsIO sample1 sample2 iterator strat action = do
  where executeStrat =  play (prisonersDilemmaCont sample1 sample2) strat
 
 -- fix context used for the evaluation
-contextCont sample1 sample2 iterator strat initialAction = MonadContext (pure ((),initialAction)) (\_ action -> determineContinuationPayoffsIO sample1 sample2 iterator strat action)
+contextCont  iterator strat initialAction = MonadContext (pure ((),initialAction)) (\_ action -> determineContinuationPayoffsIO iterator strat action)
 
--- eq definition
-repeatedPDEq sample1 sample2 iterator strat initialAction = evaluate (prisonersDilemmaCont sample1 sample2) strat context
-  where context  = contextCont sample1 sample2 iterator strat initialAction
 
--- Prints the information using the logging
-printOutput :: Int
-            -- ^ Sample size for player 1
-            -> Int
-            -- ^ Sample size for player 2
-            -> Integer
-            -> List
-                  '[Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD,
-                    Kleisli CondensedTableV (ActionPD, ActionPD) ActionPD]
-            -> (ActionPD, ActionPD)
-            -> IO ()
-printOutput sample1 sample2 iterator strat initialAction = do
-  indentRef <- newIORef 0
-  runRIO (mkGLogFunc logFuncSilent :: GLogFunc (Msg ActionPD)) $ do
-    let resultIOs = repeatedPDEq sample1 sample2 iterator strat initialAction
-    traverseList_ (Proxy :: Proxy Show) (liftIO . print) resultIOs
-    pure ()
+
+repeatedPDEq  iterator strat initialAction = evaluate prisonersDilemmaCont strat context
+  where context  = contextCont iterator strat initialAction
+
+
+printOutput iterator strat initialAction = do
+  let (result1 ::- result2 ::- Nil) = repeatedPDEq iterator strat initialAction
+  result1' <- result1
+  result2' <- result2
+  putStrLn "Player1"
+  print result1'
+  putStrLn "Player2"
+  print result2'
 
 ----------------------------------------------------
 -- Equilibrium analysis
