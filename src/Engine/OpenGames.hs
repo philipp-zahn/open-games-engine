@@ -1,6 +1,13 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 
 module Engine.OpenGames
  ( OpenGame(..)
@@ -32,7 +39,7 @@ reindex v u g = OpenGame {
   evaluate = \a c -> u a (evaluate g (v a) c)
 }
 
-(>>>) :: (Optic o, Context c o, Unappend a, Unappend b)
+(>>>) :: (Optic o, Context c o, Unappend a, Unappend b) -- TODO check Unappend b
       => OpenGame o c a b x s y r -> OpenGame o c a' b' y r z q
       -> OpenGame o c (a +:+ a') (b +:+ b') x s z q
 (>>>) g h = OpenGame {
@@ -41,7 +48,7 @@ reindex v u g = OpenGame {
                                                   +:+ evaluate h a' (cmap (play g a) identity c)
 }
 
-(&&&) :: (Optic o, Context c o, Unappend a, Unappend b, Show x, Show x')
+(&&&) :: (Optic o, Context c o, Unappend a, Unappend b, Show x, Show x') -- TODO check Unappend b
       => OpenGame o c a b x s y r -> OpenGame o c a' b' x' s' y' r'
       -> OpenGame o c (a +:+ a') (b +:+ b') (x, x') (s, s') (y, y') (r, r')
 (&&&) g h = OpenGame {
@@ -50,13 +57,29 @@ reindex v u g = OpenGame {
                                                   +:+ evaluate h a' (play g a // c)
 }
 
-(+++) :: (Optic o, Context c o, Unappend a, Unappend b, Show x)
+(+++) :: forall o c a a' b b1 bs b' b1' bs' x s y y' r.  ((b ~ (b1 ': bs)), ((b' ~ (b1' ': bs')), Optic o, Context c o, Unappend a, Show x))
       => OpenGame o c a b x s y r -> OpenGame o c a' b' x s y' r
-      -> OpenGame o c (a +:+ a') '[[Maybe b],[Maybe b']] (Either x x) s (Either y y') r
+      -> OpenGame o c (a +:+ a') (FctMap Maybe b +:+ FctMap Maybe b') (Either x x) s (Either y y') r
 (+++) g h  = OpenGame {
   play = \as -> case unappend as of (a, a') -> play g a ++++ play h a',
-  evaluate =
+  evaluate = 
    \as c ->
-     case unappend as of (a, a') -> let e1 = case prl c of {Nothing -> [Nothing] ::- Nil ; Just c1 -> mapL Just (evaluate g a c1)}
-                                        e2 = case prr c of {Nothing -> [Nothing] ::- Nil ; Just c2 -> mapL Just (evaluate h a' c2)}
-                                        in e1 +:+ e2}
+     case unappend as of (a, a') -> let e1 = case prl c of {Nothing -> Nothing ::- Nil ; Just c1 ->
+                                                            test (evaluate g a c1)}
+                                        e2 = undefined-- case prr c of {Nothing -> Nothing ::- Nil ; Just c2 -> mapL Just @_ @(FctMap Maybe b') (Just (evaluate h a' c2))}
+                                                 in e1 +:+ e2}
+
+
+--testFunction :: FctMap Maybe xs 
+--testFunction hlist = mapL Just hlist
+
+test :: forall x xs' xs. ((xs ~ (x ': xs')), MapL (x -> Maybe x) xs (FctMap Maybe xs) ) => List xs -> List (FctMap Maybe xs) 
+test xs = mapL @(x -> Maybe x) @_ @(FctMap Maybe xs) Just xs
+
+elem1 :: Int
+elem1 = 1
+
+elemA :: String
+elemA = "a"
+
+test2 = test (elem1 ::-  elem1 ::- Nil)

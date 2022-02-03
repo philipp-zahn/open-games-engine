@@ -19,7 +19,8 @@ module Engine.TLL
   , Unappend(..)
   , MapL(..)
   , FoldrL(..)
-  , ConstMap(..)
+  , ConstMap
+  , FctMap
   , SequenceList(..)
   , Natural(..)
   , IndexList(..)
@@ -97,6 +98,9 @@ type family ConstMap (t :: *) (xs :: [*]) :: [*] where
   ConstMap _      '[]  = '[]
   ConstMap t (x ': xs) = t ': (ConstMap t xs)
 
+type family FctMap (f :: * -> *) (xs :: [*]) :: [*] where
+  FctMap _ '[]         = '[]
+  FctMap f (x ': xs)   = f x ': (FctMap f xs)
 
 
 
@@ -131,6 +135,12 @@ instance IndexList Z (x ': xs) x where
 instance IndexList n xs a => IndexList (S n) (x ': xs) a where
    fromIndex (Succ n) (_ ::- xs) = fromIndex n xs
 
+
+--------------------------------------
+-- Maybe type for branching
+
+instance forall x . Apply (x -> Maybe x) x (Maybe x)  where
+  apply f x = f x
 
 --------------------------------------
 -- List functionality
