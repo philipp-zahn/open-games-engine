@@ -49,3 +49,14 @@ reindex v u g = OpenGame {
   evaluate = \as c -> case unappend as of (a, a') -> evaluate g a (play h a' \\ c)
                                                   +:+ evaluate h a' (play g a // c)
 }
+
+(+++) :: (Optic o, Context c o, Unappend a, Unappend b, Show x)
+      => OpenGame o c a b x s y r -> OpenGame o c a' b' x s y' r
+      -> OpenGame o c (a +:+ a') '[[Maybe b],[Maybe b']] (Either x x) s (Either y y') r
+(+++) g h  = OpenGame {
+  play = \as -> case unappend as of (a, a') -> play g a ++++ play h a',
+  evaluate =
+   \as c ->
+     case unappend as of (a, a') -> let e1 = case prl c of {Nothing -> [Nothing] ::- Nil ; Just c1 -> mapL Just (evaluate g a c1)}
+                                        e2 = case prr c of {Nothing -> [Nothing] ::- Nil ; Just c2 -> mapL Just (evaluate h a' c2)}
+                                        in e1 +:+ e2}
