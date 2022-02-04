@@ -69,7 +69,7 @@ reindex v u g = OpenGame {
                                         e2 = undefined-- case prr c of {Nothing -> Nothing ::- Nil ; Just c2 -> mapL Just @_ @(FctMap Maybe b') (Just (evaluate h a' c2))}
                                                  in e1 +:+ e2}
 
-
+M
 --testFunction :: FctMap Maybe xs 
 --testFunction hlist = mapL Just hlist
 
