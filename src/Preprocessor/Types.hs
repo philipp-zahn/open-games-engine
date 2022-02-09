@@ -13,9 +13,11 @@ tuple :: [String] -> String
 tuple [x] = x
 tuple xs = "(" ++ intercalate ", " xs ++ ")"
 
-instance Show (Variables String) where show = tuple . vars
-instance Show (Expressions String) where show = tuple . exps
+-- instance Show (Variables String) where show = tuple . vars
+instance Show e => Show (Expressions e) where show = tuple . map show . exps
 
+instance Show p => Show (Variables p) where
+  show = tuple . map show . vars
 
 -- newtype AtomExpression = AtomExpression String
 --
@@ -35,7 +37,7 @@ data FunctionExpression p e = Identity                             -- \x -> x
 flattenVariables :: [Variables p] -> Variables p
 flattenVariables = Variables . concat . map vars
 
-instance Show (FunctionExpression String String) where
+instance (Show p, Show e) => Show (FunctionExpression p e) where
   show Identity         = "\\x -> x"
   show Copy             = "\\x -> (x, x)"
   show (Lambda x e)     = concat ["\\", show x, " -> ", show e]
@@ -52,13 +54,13 @@ data FreeOpenGame p e = Atom e
                       | Simultaneous (FreeOpenGame p e) (FreeOpenGame p e)
                       deriving (Eq, Functor)
 
-instance Show (FreeOpenGame String String)  where
-  show (Atom e)           = concat [")",  e, ")"]
+instance (Show e, Show p) => Show (FreeOpenGame p e)  where
+  show (Atom e)           = concat [")",  show e, ")"]
   show (Lens v u)         = concat ["fromLens (", show v, ") (", show u, ")"]
   show (Function f g)     = concat ["fromFunctions (", show f, ") (", show g, ")"]
   show Counit             = "counit"
   show (Sequential g h)   = concat ["(", show g, ") >>> (", show h, ")"]
   show (Simultaneous g h) = concat ["(", show g, ") &&& (", show h, ")"]
 
-instance Show (FreeOpenGame String Exp) where
-  show game = show $ fmap show game
+-- instance Show (FreeOpenGame String Exp) where
+--   show game = show $ fmap show game

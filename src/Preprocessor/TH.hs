@@ -49,12 +49,18 @@ interpretFunction Copy = [| \x -> (x, x) |]
 --     ([v],  e ) -> pure $ LamE (pure $      v) (mkTup [            patToExp v, mkTup e])
 --     ( v ,  e ) -> pure $ LamE (pure $ TupP v) (mkTup [mkTup $ map patToExp v, mkTup e])
 
+interpretFunction (Lambda (Variables [vars]) (Expressions exps)) =
+  pure $ LamE (pure $ vars) (mkTup exps)
 interpretFunction (Lambda (Variables vars) (Expressions exps)) =
   pure $ LamE (pure $ TupP vars) (mkTup exps)
+interpretFunction (CopyLambda (Variables [vars]) (Expressions exps)) =
+  pure $ LamE (pure $ vars) (mkTup [mkTup $ [patToExp vars], mkTup exps])
+interpretFunction (CopyLambda (Variables [vars]) (Expressions exps)) =
+  pure $ LamE (pure $ vars) (mkTup [mkTup $ [patToExp vars], mkTup exps])
 interpretFunction (CopyLambda (Variables vars) (Expressions exps)) =
   pure $ LamE (pure $ TupP vars) (mkTup [mkTup $ map patToExp vars, mkTup exps])
 
-interpretFunction (Multiplex (Variables { vars }) (Variables { vars = vars' })) =
+interpretFunction (Multiplex (Variables vars) (Variables vars')) =
   pure $ LamE (pure $ TupP [combinePats vars, combinePats vars']) (mkTup $ map patToExp (vars ++ vars'))
 interpretFunction (Curry f) = [| curry $(interpretFunction f)|]
 

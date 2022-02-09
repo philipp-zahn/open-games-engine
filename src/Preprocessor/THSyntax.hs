@@ -17,7 +17,7 @@ import Preprocessor.Types
 import Preprocessor.AbstractSyntax
 import Data.List (inits, tails)
 import Data.Bifunctor
-
+import Debug.Trace
 
 type SLine = Line (Maybe String) Pat Exp
 type QLine = Line (Maybe String) String (Q Exp)
@@ -46,8 +46,8 @@ compileLine (LineWithContext l cov con) = Sequential (Sequential l1 l2 )  l3
         l3 = Function (Multiplex cov (Variables $ (covariantOutputs l)))
                       (CopyLambda con (Expressions (contravariantInputs l)))
 
-compileBlock :: forall p e. Block p e -> FreeOpenGame p e
-compileBlock block = Sequential (Sequential l1 l2) l3
+compileBlock :: forall p e. (Show p, Show e) => Block p e -> FreeOpenGame p e
+compileBlock block = Sequential (Sequential l1 l2) (trace ("third lens: " ++ show l3) l3)
   where lines :: [LineWithContext p e]
         lines = linesWithContext block
         covariantBlockContext = flattenVariables [
@@ -56,7 +56,7 @@ compileBlock block = Sequential (Sequential l1 l2) l3
                                                      , Variables (contravariantOutputs (line (head lines)))]
         l1 = Function Identity (Lambda contravariantBlockContext (Expressions (blockContravariantOutputs block)))
         l2 = foldl1 Sequential (map compileLine lines)
-        l3 = Lens (Lambda covariantBlockContext (Expressions (blockCovariantOutputs block)))
+        l3 = Lens (Lambda (trace ("covariant context: " ++ show covariantBlockContext) covariantBlockContext) (Expressions (blockCovariantOutputs block)))
                   (Curry (Multiplex covariantBlockContext (Variables (blockContravariantInputs block))))
 
 
