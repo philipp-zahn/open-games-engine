@@ -55,7 +55,7 @@ compileLambda (Do sm) = DoE (map toStatement sm)
     toStatement :: (Maybe String, Lambda) -> Stmt
     toStatement (Nothing, lam) = NoBindS (compileLambda lam)
     toStatement (Just pat, lam) = BindS (VarP (mkName pat)) (compileLambda lam)
-compileLambda (Tuple f s r) = TupE (map (compileLambda) (f : s : r))
+compileLambda (Tuple f s r) = mkTup (map (compileLambda) (f : s : r))
 compileLambda (Range range) = ArithSeqE (compileRange range)
 compileLambda (IfThenElse prd thn els) = CondE (compileLambda prd) (compileLambda thn) (compileLambda els)
 compileLambda (Ifix op left right) = InfixE (Just $ compileLambda left)
