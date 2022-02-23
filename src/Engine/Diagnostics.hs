@@ -14,6 +14,7 @@ module Engine.Diagnostics
   ( DiagnosticInfoBayesian(..)
   , generateOutput
   , generateIsEq
+  , generateEquilibrium
   ) where
 
 import Engine.OpticClass
@@ -63,6 +64,14 @@ checkEqL ls = let xs = fmap equilibrium ls
                   in if isEq == True then "\n Strategies are in equilibrium"
                                       else "\n Strategies are NOT in equilibrium. Consider the following profitable deviations: \n"  ++ showDiagnosticInfoL ys
 
+-- map diagnostics to equilibrium
+toEquilibrium :: DiagnosticInfoBayesian x y -> Bool
+toEquilibrium = equilibrium
+
+equilibriumMap :: [DiagnosticInfoBayesian x y] -> Bool
+equilibriumMap = and . fmap toEquilibrium
+
+
 ----------------------------------------------------------
 -- providing the relevant functionality at the type level
 -- for show output
@@ -90,6 +99,17 @@ data Concat = Concat
 instance Apply Concat String (String -> String) where
   apply _ x = \y -> x ++ "\n NEWGAME: \n" ++ y
 
+-- for apply output of equilibrium function
+data Equilibrium = Equilibrium 
+
+instance Apply Equilibrium [DiagnosticInfoBayesian x y] Bool where
+  apply _ x = equilibriumMap x
+
+data And = And
+
+instance Apply And Bool (Bool -> Bool) where
+  apply _ x = \y -> y && x
+
 
 ---------------------
 -- main functionality
@@ -110,4 +130,9 @@ generateIsEq :: forall xs.
 generateIsEq hlist = putStrLn $
   "----Analytics begin----" ++ (foldrL Concat "" $ mapL @_ @_ @(ConstMap String xs) PrintIsEq hlist) ++ "----Analytics end----\n"
 
- 
+-- give equilibrium value for further use
+generateEquilibrium :: forall xs.
+              ( MapL   Equilibrium xs     (ConstMap Bool xs)
+               , FoldrL And Bool (ConstMap Bool xs)
+               ) => List xs -> Bool
+generateEquilibrium hlist = foldrL And True $ mapL @_ @_ @(ConstMap Bool xs) Equilibrium hlist
