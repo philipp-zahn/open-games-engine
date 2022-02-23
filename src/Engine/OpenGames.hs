@@ -39,7 +39,7 @@ reindex v u g = OpenGame {
   evaluate = \a c -> u a (evaluate g (v a) c)
 }
 
-(>>>) :: (Optic o, Context c o, Unappend a, Unappend b) -- TODO check Unappend b
+(>>>) :: (Optic o, Context c o, Unappend a)
       => OpenGame o c a b x s y r -> OpenGame o c a' b' y r z q
       -> OpenGame o c (a +:+ a') (b +:+ b') x s z q
 (>>>) g h = OpenGame {
@@ -48,7 +48,7 @@ reindex v u g = OpenGame {
                                                   +:+ evaluate h a' (cmap (play g a) identity c)
 }
 
-(&&&) :: (Optic o, Context c o, Unappend a, Unappend b, Show x, Show x') -- TODO check Unappend b
+(&&&) :: (Optic o, Context c o, Unappend a, Show x, Show x')
       => OpenGame o c a b x s y r -> OpenGame o c a' b' x' s' y' r'
       -> OpenGame o c (a +:+ a') (b +:+ b') (x, x') (s, s') (y, y') (r, r')
 (&&&) g h = OpenGame {
@@ -57,29 +57,23 @@ reindex v u g = OpenGame {
                                                   +:+ evaluate h a' (play g a // c)
 }
 
-(+++) :: forall o c a a' b b1 bs b' b1' bs' x s y y' r.  ((b ~ (b1 ': bs)), ((b' ~ (b1' ': bs')), Optic o, Context c o, Unappend a, Show x))
-      => OpenGame o c a b x s y r -> OpenGame o c a' b' x s y' r
-      -> OpenGame o c (a +:+ a') (FctMap Maybe b +:+ FctMap Maybe b') (Either x x) s (Either y y') r
+(+++) :: (Optic o, ContextAdd c, Unappend a1)
+      => OpenGame o c a1 '[Maybe b1] x1 s y1 r
+      -> OpenGame o c a2 '[Maybe b2] x2 s y2 r
+      -> OpenGame
+          o
+          c
+          (a1 +:+ a2)
+          '[Maybe b1, Maybe b2]
+          (Either x1 x2)
+          s
+          (Either y1 y2)
+          r
 (+++) g h  = OpenGame {
   play = \as -> case unappend as of (a, a') -> play g a ++++ play h a',
   evaluate = 
    \as c ->
-     case unappend as of (a, a') -> let e1 = case prl c of {Nothing -> Nothing ::- Nil ; Just c1 ->
-                                                            test (evaluate g a c1)}
-                                        e2 = undefined-- case prr c of {Nothing -> Nothing ::- Nil ; Just c2 -> mapL Just @_ @(FctMap Maybe b') (Just (evaluate h a' c2))}
+     case unappend as of (a, a') -> let e1 = case prl c of {Nothing -> Nothing ::- Nil ; Just c1 -> (evaluate g a c1)}
+                                        e2 = case prr c of {Nothing -> Nothing ::- Nil ; Just c2 -> (evaluate h a' c2)}
                                                  in e1 +:+ e2}
 
-M
---testFunction :: FctMap Maybe xs 
---testFunction hlist = mapL Just hlist
-
-test :: forall x xs' xs. ((xs ~ (x ': xs')), MapL (x -> Maybe x) xs (FctMap Maybe xs) ) => List xs -> List (FctMap Maybe xs) 
-test xs = mapL @(x -> Maybe x) @_ @(FctMap Maybe xs) Just xs
-
-elem1 :: Int
-elem1 = 1
-
-elemA :: String
-elemA = "a"
-
-test2 = test (elem1 ::-  elem1 ::- Nil)
