@@ -28,6 +28,7 @@ module Engine.Engine
   , reindex
   , (>>>)
   , (&&&)
+  , (+++)
   , Stochastic(..)
   , Vector(..)
   , StochasticStatefulOptic(..)

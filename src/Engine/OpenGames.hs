@@ -15,6 +15,7 @@ module Engine.OpenGames
  , reindex
  , (>>>)
  , (&&&)
+ , (+++)
  ) where
 
 
