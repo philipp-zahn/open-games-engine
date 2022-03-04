@@ -137,12 +137,6 @@ instance IndexList n xs a => IndexList (S n) (x ': xs) a where
 
 
 --------------------------------------
--- Maybe type for branching
-
-instance forall x . Apply (x -> Maybe x) x (Maybe x)  where
-  apply f x = f x
-
---------------------------------------
 -- List functionality
 
 headL :: List (a ': as) -> a

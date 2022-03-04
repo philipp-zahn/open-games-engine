@@ -12,9 +12,11 @@
 
 module Engine.Diagnostics
   ( DiagnosticInfoBayesian(..)
+  , MaybeL
   , generateOutput
   , generateIsEq
   , generateEquilibrium
+  , generateMaybeList
   ) where
 
 import Engine.OpticClass
@@ -109,6 +111,17 @@ data And = And
 
 instance Apply And Bool (Bool -> Bool) where
   apply _ x = \y -> y && x
+
+data MaybeL = MaybeL
+
+-- For branching operator
+instance forall x . Apply MaybeL x (Maybe x)  where
+  apply _ x = Just x
+
+generateMaybeList :: forall xs .
+                   (MapL MaybeL xs (FctMap Maybe xs))
+                   => List xs -> List (FctMap Maybe xs)
+generateMaybeList hList = mapL MaybeL hList
 
 
 ---------------------
