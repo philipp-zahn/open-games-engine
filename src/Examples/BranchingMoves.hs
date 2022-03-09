@@ -55,9 +55,40 @@ chooseDilemma = [opengame|
    outputs   :      ;
    returns   :      ;
   |]
---}
+branchingPDMeetingINNY :: OpenGame
+                            StochasticStatefulOptic
+                            StochasticStatefulContext
+                            '[Kleisli Stochastic () ActionPD
+                             , Kleisli Stochastic () ActionPD
+                             , Kleisli Stochastic () Integer]
+                            '[Maybe [DiagnosticInfoBayesian () ActionPD]
+                             , Maybe [DiagnosticInfoBayesian () ActionPD]
+                             , Maybe [DiagnosticInfoBayesian () Integer]]
+                            (Either () ())
+                            ()
+                            (Either () ())
+                            ()
+branchingPDMeetingINNY =  prisonersDilemmaVerbose +++  player1Move --  meetingInNYReduced
 
-branchingPDMeetinINNY =  prisonersDilemmaVerbose +++  meetingInNYReduced
+
+
+--}
+branchingPDMeetingINNY :: OpenGame
+                            StochasticStatefulOptic
+                            StochasticStatefulContext
+                            '[Kleisli Stochastic () ActionPD
+                             , Kleisli Stochastic () ActionPD
+                             , Kleisli Stochastic () Integer]
+                            '[Maybe [DiagnosticInfoBayesian () ActionPD]
+                             , Maybe [DiagnosticInfoBayesian () ActionPD]
+                             , Maybe [DiagnosticInfoBayesian () Integer]]
+                            (Either () ())
+                            ()
+                            (Either () ())
+                            ()
+branchingPDMeetingINNY = player1Move +++  prisonersDilemmaVerbose --  meetingInNYReduced
+
+test = (+++) prisonersDilemmaVerbose 
 
 player1Move =  [opengame|
 
@@ -67,7 +98,7 @@ player1Move =  [opengame|
    :----------------------------:
    inputs    :      ;
    feedback  :      ;
-   operation : dependentDecision "player2" (const [1,2]);
+   operation : dependentDecision "player1" (const [1,2]);
    outputs   : decisionPlayer1 ;
    returns   : 0 ;
    // player 1 gets no payoff 
@@ -98,4 +129,4 @@ player2Move =  [opengame|
    returns   :      ;
   |]
 
-test = player1Move +++ player2Move
+branchedGame = player1Move +++ player2Move
