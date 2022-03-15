@@ -72,7 +72,7 @@ branchingPDMeetingINNY =  prisonersDilemmaVerbose +++  player1Move --  meetingIn
 
 
 
---}
+
 branchingPDMeetingINNY :: OpenGame
                             StochasticStatefulOptic
                             StochasticStatefulContext
@@ -89,7 +89,7 @@ branchingPDMeetingINNY :: OpenGame
 branchingPDMeetingINNY = player1Move +++  prisonersDilemmaVerbose --  meetingInNYReduced
 
 test = (+++) prisonersDilemmaVerbose 
-
+--}
 player1Move =  [opengame|
 
    inputs    :      ;

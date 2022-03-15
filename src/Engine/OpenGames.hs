@@ -59,8 +59,8 @@ reindex v u g = OpenGame {
                                                   +:+ evaluate h a' (play g a // c)
 }
 
-(+++) :: (Optic o, ContextAdd c, Unappend a1, MapL MaybeL b1 (FctMap Maybe b1), MapL MaybeL b2 (FctMap Maybe b2))
-          -- FctMap Maybe b1 ~ '[Maybe b1'], FctMap Maybe b2 ~ '[Maybe b2'])
+(+++) :: (Optic o, ContextAdd c, Unappend a1, MapL MaybeL b1 (FctMap Maybe b1), MapL MaybeL b2 (FctMap Maybe b2),
+          FctMap Maybe b1 ~ '[Maybe b1'], FctMap Maybe b2 ~ '[Maybe b2'])
       => OpenGame o c a1 b1 x1 s y1 r
       -> OpenGame o c a2 b2 x2 s y2 r
       -> OpenGame
