@@ -13,10 +13,12 @@
 module Engine.Diagnostics
   ( DiagnosticInfoBayesian(..)
   , MaybeL
+  , NothingL
   , generateOutput
   , generateIsEq
   , generateEquilibrium
   , generateMaybeList
+  , generateNothingList
   ) where
 
 import Engine.OpticClass
@@ -42,7 +44,7 @@ data DiagnosticInfoBayesian x y = DiagnosticInfoBayesian
 
 -- prepare string information for Bayesian game
 showDiagnosticInfo :: (Show y, Ord y, Show x) => DiagnosticInfoBayesian x y -> String
-showDiagnosticInfo info =  
+showDiagnosticInfo info =
      "\n"    ++ "Player: " ++ player info
      ++ "\n" ++ "Optimal Move: " ++ (show $ optimalMove info)
      ++ "\n" ++ "Current Strategy: " ++ (show $ strategy info)
@@ -53,10 +55,10 @@ showDiagnosticInfo info =
 
 
 
--- output string information for a subgame expressions containing information from several players - bayesian 
+-- output string information for a subgame expressions containing information from several players - bayesian
 showDiagnosticInfoL :: (Show y, Ord y, Show x) => [DiagnosticInfoBayesian x y] -> String
 showDiagnosticInfoL [] = "\n --No more information--"
-showDiagnosticInfoL (x:xs)  = showDiagnosticInfo x ++ "\n --other game-- " ++ showDiagnosticInfoL xs 
+showDiagnosticInfoL (x:xs)  = showDiagnosticInfo x ++ "\n --other game-- " ++ showDiagnosticInfoL xs
 
 -- checks equilibrium and if not outputs relevant deviations
 checkEqL :: (Show y, Ord y, Show x) => [DiagnosticInfoBayesian x y] -> String
@@ -102,7 +104,7 @@ instance Apply Concat String (String -> String) where
   apply _ x = \y -> x ++ "\n NEWGAME: \n" ++ y
 
 -- for apply output of equilibrium function
-data Equilibrium = Equilibrium 
+data Equilibrium = Equilibrium
 
 instance Apply Equilibrium [DiagnosticInfoBayesian x y] Bool where
   apply _ x = equilibriumMap x
@@ -118,11 +120,21 @@ data MaybeL = MaybeL
 instance forall x . Apply MaybeL x (Maybe x)  where
   apply _ x = Just x
 
+data NothingL = NothingL
+
+-- For branching operator
+instance forall x . Apply NothingL x (Maybe x)  where
+  apply _ x = Nothing
+
 generateMaybeList :: forall xs .
                    (MapL MaybeL xs (FctMap Maybe xs))
                    => List xs -> List (FctMap Maybe xs)
 generateMaybeList hList = mapL MaybeL hList
 
+generateNothingList :: forall xs .
+                   (MapL NothingL xs (FctMap Maybe xs))
+                   => List xs -> List (FctMap Maybe xs)
+generateNothingList hList = mapL NothingL hList
 
 ---------------------
 -- main functionality

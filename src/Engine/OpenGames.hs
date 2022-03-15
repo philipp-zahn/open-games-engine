@@ -22,6 +22,7 @@ module Engine.OpenGames
 import Engine.OpticClass
 import Engine.TLL
 import Engine.Diagnostics
+import Unsafe.Coerce
 
 data OpenGame o c a b x s y r = OpenGame {
   play :: List a -> o x s y r,
@@ -59,15 +60,20 @@ reindex v u g = OpenGame {
                                                   +:+ evaluate h a' (play g a // c)
 }
 
-(+++) :: (Optic o, ContextAdd c, Unappend a1, MapL MaybeL b1 (FctMap Maybe b1), MapL MaybeL b2 (FctMap Maybe b2),
-          FctMap Maybe b1 ~ '[Maybe b1'], FctMap Maybe b2 ~ '[Maybe b2'])
+--- This works because we assume that a1 and a2 have the same lengths as b1 and b2 respectively.
+-- If they don't anything could break because of unsafecoerce.
+-- This could be fixed if we knew the length of b1 and b2
+-- If the type signature was honest, it would say
+-- `MapL NothingL b1 (FctMap Maybe b1), MapL NothingL b2 (FctMap Maybe b2))`
+(+++) :: (Optic o, ContextAdd c, Unappend a1, MapL MaybeL b1 (FctMap Maybe b1), MapL MaybeL b2 (FctMap Maybe b2)
+         , MapL NothingL a1 (FctMap Maybe a1), MapL NothingL a2 (FctMap Maybe a2))
       => OpenGame o c a1 b1 x1 s y1 r
       -> OpenGame o c a2 b2 x2 s y2 r
       -> OpenGame
           o
           c
           (a1 +:+ a2)
-          ('[Maybe b1'] +:+ '[Maybe b2'])
+          ((FctMap Maybe b1) +:+ (FctMap Maybe b2))
           (Either x1 x2)
           s
           (Either y1 y2)
@@ -76,7 +82,11 @@ reindex v u g = OpenGame {
   play = \as -> case unappend as of (a, a') -> play g a ++++ play h a',
   evaluate =
    \as c ->
-     case unappend as of (a, a') -> let e1 = case prl c of {Nothing ->  (Nothing ::- Nil) ; Just c1 -> generateMaybeList (evaluate g a c1)}
-                                        e2 = case prr c of {Nothing ->  (Nothing ::- Nil) ; Just c2 -> generateMaybeList (evaluate h a' c2)}
-                                                 in e1 +:+ e2}
+     case unappend as of
+          (a, a') ->
+              let e1 = case prl c of {Nothing -> unsafeCoerce (generateNothingList a)
+                                    ; Just c1 -> generateMaybeList (evaluate g a c1)}
+                  e2 = case prr c of {Nothing -> unsafeCoerce (generateNothingList a')
+                                    ; Just c2 -> generateMaybeList (evaluate h a' c2)}
+               in e1 +:+ e2}
 
