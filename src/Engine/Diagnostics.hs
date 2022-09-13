@@ -37,6 +37,19 @@ data DiagnosticInfoBayesian x y = DiagnosticInfoBayesian
   , state           :: x
   , unobservedState :: String}
 
+-- Manual instance for Show (dealing with the exception cases)
+instance (Show x, Show y, Ord y) => Show (DiagnosticInfoBayesian x y) where
+  show (DiagnosticInfoBayesian e p o s oP c pay st unobs) =
+    "Equilibrium: "
+    ++ (show e)  ++ "\n" ++
+    "Player: " ++ p ++ "\n" ++
+    "Optimal move: " ++ (show o) ++ "\n" ++
+    "Strategy: " ++ (show s) ++ "\n" ++
+    "OptimalPayoff: " ++ (show oP) ++ "\n" ++
+    "Context cannot be printed " ++ "\n"++
+    "State: " ++ (show st) ++ "\n" ++
+    "UnobservedState: " ++ unobs
+    
 
 -- prepare string information for Bayesian game
 showDiagnosticInfo :: (Show y, Ord y, Show x) => DiagnosticInfoBayesian x y -> String
