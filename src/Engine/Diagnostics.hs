@@ -49,12 +49,28 @@ showDiagnosticInfo info =
      ++ "\n" ++ "Observable State: " ++ (show $ state info)
      ++ "\n" ++ "Unobservable State: " ++ (show $ unobservedState info)
 
+-- prepare string information for Bayesian game with Either input
+showDiagnosticInfoEither :: (Show y, Ord y, Show x) => DiagnosticInfoBayesian (Either String x) y -> String
+showDiagnosticInfoEither info =  
+     "\n"    ++ "Player: " ++ player info
+     ++ "\n" ++ "Optimal Move: " ++ (show $ optimalMove info)
+     ++ "\n" ++ "Current Strategy: " ++ (show $ strategy info)
+     ++ "\n" ++ "Optimal Payoff: " ++ (show $ optimalPayoff info)
+     ++ "\n" ++ "Current Payoff: " ++ (show $ payoff info)
+     ++ "\n" ++ "Observable State: " ++ (show $ state info)
+     ++ "\n" ++ "Unobservable State: " ++ (show $ unobservedState info)
 
 
 -- output string information for a subgame expressions containing information from several players - bayesian 
 showDiagnosticInfoL :: (Show y, Ord y, Show x) => [DiagnosticInfoBayesian x y] -> String
 showDiagnosticInfoL [] = "\n --No more information--"
 showDiagnosticInfoL (x:xs)  = showDiagnosticInfo x ++ "\n --other game-- " ++ showDiagnosticInfoL xs 
+
+-- output string information for a subgame expressions containing information from several players - bayesian  with Either input
+showDiagnosticInfoLEither :: (Show y, Ord y, Show x) => [DiagnosticInfoBayesian (Either String x) y] -> String
+showDiagnosticInfoLEither [] = "\n --No more information--"
+showDiagnosticInfoLEither (x:xs)  = showDiagnosticInfoEither x ++ "\n --other game-- " ++ showDiagnosticInfoLEither xs 
+
 
 -- checks equilibrium and if not outputs relevant deviations
 checkEqL :: (Show y, Ord y, Show x) => [DiagnosticInfoBayesian x y] -> String
@@ -64,12 +80,31 @@ checkEqL ls = let xs = fmap equilibrium ls
                   in if isEq == True then "\n Strategies are in equilibrium"
                                       else "\n Strategies are NOT in equilibrium. Consider the following profitable deviations: \n"  ++ showDiagnosticInfoL ys
 
+-- checks equilibrium and if not outputs relevant deviations - Either case
+checkEqLEither :: (Show y, Ord y, Show x) => [DiagnosticInfoBayesian (Either String x) y] -> String
+checkEqLEither ls = let xs = fmap equilibrium ls
+                        ys = filter (\x -> equilibrium x == False) ls
+                        isEq = and xs
+                        in if isEq == True then "\n Strategies are in equilibrium"
+                                            else "\n Strategies are NOT in equilibrium. Consider the following profitable deviations: \n"  ++ showDiagnosticInfoLEither ys
+
+
+
+
 -- map diagnostics to equilibrium
 toEquilibrium :: DiagnosticInfoBayesian x y -> Bool
 toEquilibrium = equilibrium
 
 equilibriumMap :: [DiagnosticInfoBayesian x y] -> Bool
 equilibriumMap = and . fmap toEquilibrium
+
+-- map diagnostics to equilibrium -- Either case
+toEquilibriumEither :: DiagnosticInfoBayesian (Either String x) y -> Bool
+toEquilibriumEither = equilibrium
+
+equilibriumMapEither :: [DiagnosticInfoBayesian (Either String x) y] -> Bool
+equilibriumMapEither = and . fmap toEquilibrium
+
 
 
 ----------------------------------------------------------
@@ -81,17 +116,26 @@ data ShowDiagnosticOutput = ShowDiagnosticOutput
 instance (Show y, Ord y, Show x) => Apply ShowDiagnosticOutput [DiagnosticInfoBayesian x y] String where
   apply _ x = showDiagnosticInfoL x
 
+instance (Show y, Ord y, Show x) => Apply ShowDiagnosticOutput [DiagnosticInfoBayesian (Either String x) y] String where
+  apply _ x = showDiagnosticInfoLEither x
+
 
 data PrintIsEq = PrintIsEq
 
 instance (Show y, Ord y, Show x) => Apply PrintIsEq [DiagnosticInfoBayesian x y] String where
   apply _ x = checkEqL x
 
+instance (Show y, Ord y, Show x) => Apply PrintIsEq [DiagnosticInfoBayesian (Either String x) y] String where
+  apply _ x = checkEqLEither x
 
 data PrintOutput = PrintOutput
 
 instance (Show y, Ord y, Show x) => Apply PrintOutput [DiagnosticInfoBayesian x y] String where
   apply _ x = showDiagnosticInfoL x
+
+instance (Show y, Ord y, Show x) => Apply PrintOutput [DiagnosticInfoBayesian (Either String x) y] String where
+  apply _ x = showDiagnosticInfoLEither x
+
 
 
 data Concat = Concat
@@ -104,6 +148,11 @@ data Equilibrium = Equilibrium
 
 instance Apply Equilibrium [DiagnosticInfoBayesian x y] Bool where
   apply _ x = equilibriumMap x
+
+instance Apply Equilibrium [DiagnosticInfoBayesian (Either String x) y] Bool where
+  apply _ x = equilibriumMapEither x
+
+
 
 data And = And
 
