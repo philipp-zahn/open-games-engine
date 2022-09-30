@@ -116,7 +116,7 @@ toEquilibriumEither :: DiagnosticInfoBayesian (Either String x) y -> Bool
 toEquilibriumEither = equilibrium
 
 equilibriumMapEither :: [DiagnosticInfoBayesian (Either String x) y] -> Bool
-equilibriumMapEither = and . fmap toEquilibrium
+equilibriumMapEither = and . fmap toEquilibriumEither
 
 
 
