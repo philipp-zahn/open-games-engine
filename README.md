@@ -37,7 +37,7 @@ You can install stack following the instructions here: (https://docs.haskellstac
 
 Stack will be responsible for installing haskell, the Open-games-hs framework and its dependencies.
 
-Once stack is installed you can run the demo project by running `stack run`. That will execute the project, and
+Once stack is installed you can run the demo project by running `stack build --exec open-games-exe`. That will execute the project, and
 print the result of executing an equilibrium check on a very simple game. The rest of the tutorial will go into how
 to use the open-games framework in order to design and analyse games interactively using `ghci`. To invoke it, use
 `stack ghci` and that will start a new interactive session.
