@@ -121,7 +121,7 @@ singleDecisionPriorReduced actionSpace payoffFunction = [opengame|
    inputs    : x    ;
    operation : dependentDecision "player1" (\x -> actionSpace);
    outputs   : decisionPlayer1 ;
-   returns   : payoffFunction decisionPlayer1     ;
+   returns   : payoffFunction decisionPlayer1  x  ;
   |]
 
 -----------------------------------
