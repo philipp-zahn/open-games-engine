@@ -421,7 +421,7 @@ As many teachers of game theory can attest to, for beginning students it is ofte
 
 So far so good. There are one and half more complications. There are situations where you do not want to supply a pure strategy, i.e. a function which determines a single move with certainty. Instead, you may want the concrete move to be chosen from a probability distribution.
 
-For instance, in the _Matching Pennies_ game, there is only an equilibrium in non pure strategies ("mixed" strategies.) See [here](/src/Examples/SimultaneousMove.hs) for the example. We therefore need to consider something more powerful than pure functions.
+For instance, in the _Matching Pennies_ game, there is only an equilibrium in non pure strategies ("mixed" strategies.) See [here](/src/Examples/SimultaneousMoves.hs) for the example. We therefore need to consider something more powerful than pure functions.
 
 The other half of the problem is something specific to Haskell, namely the construction of strategies based on multiple possible inputs which may or may not be conditioned on. We note it here for completeness. In practice, you can ignore that.
 
