@@ -3,7 +3,14 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: monad-bayes-1.1.0@sha256:8929887b2883e553b928dcc9b1326171c87b6aa26f11800dc8c55b119a9e9649,6123
+    pantry-tree:
+      sha256: bf7f9b1351226a957c7ebd0c42316505be713690cd9d44425bd9cfd494a94161
+      size: 3568
+  original:
+    hackage: monad-bayes-1.1.0
 snapshots:
 - completed:
     sha256: 3770dfd79f5aed67acdcc65c4e7730adddffe6dba79ea723cfb0918356fc0f94

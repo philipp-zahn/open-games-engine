@@ -21,6 +21,7 @@ library
   exposed-modules:
       OpenGames.Engine.AtomicGames
       OpenGames.Engine.BayesianGames
+      OpenGames.Engine.BayesianMC
       OpenGames.Engine.Diagnostics
       OpenGames.Engine.Engine
       OpenGames.Engine.OpenGames
@@ -47,6 +48,7 @@ library
       Examples.Markov.TwoStageMarkov
       Examples.Markov.TestSimpleMonteCarlo
       Examples.Markov.TestSimpleMonteCarlo.Continuation
+      Examples.Profiling.BayesianMC
   other-modules:
       Data.Utils
       Examples.Markov.NStageMarkov
@@ -71,6 +73,7 @@ library
     , hashmap
     , haskeline
     , lens
+    , monad-bayes
     , mtl
     , mwc-random
     , parsec
@@ -104,6 +107,7 @@ executable open-games-exe
     , hashmap
     , haskeline
     , lens
+    , monad-bayes
     , mtl
     , mwc-random
     , open-games-hs

@@ -14,6 +14,7 @@ library:
   exposed-modules:
     - OpenGames.Engine.AtomicGames
     - OpenGames.Engine.BayesianGames
+    - OpenGames.Engine.BayesianMC
     - OpenGames.Engine.Diagnostics
     - OpenGames.Engine.Engine
     - OpenGames.Engine.OpenGames
@@ -40,6 +41,7 @@ library:
     - Examples.Markov.TwoStageMarkov
     - Examples.Markov.TestSimpleMonteCarlo
     - Examples.Markov.TestSimpleMonteCarlo.Continuation
+    - Examples.Profiling.BayesianMC
 
 dependencies:
     - base >=4.7 && <5
@@ -61,6 +63,7 @@ dependencies:
     - graphviz
     - lens
     - typed-process
+    - monad-bayes
     - mwc-random
     - random
     - vector
