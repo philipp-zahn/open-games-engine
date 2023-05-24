@@ -6,7 +6,7 @@
 module OpenGames.Engine.BayesianMC where
 
 import Data.HashMap as HM
-import Data.List (nub, maximumBy)
+import Data.List (nub, maximumBy, sort)
 import Data.Ord (comparing)
 
 import Control.Arrow
@@ -70,12 +70,12 @@ type StatefulKleisliOpenGame m a b x s y r
 
 type MCIO = Population SamplerIO
 
-mcSupport :: (Eq a) => Int -> MCIO a -> IO [a]
+mcSupport :: (Eq a, Ord a) => Int -> MCIO a -> IO [a]
 mcSupport numParticles a = do xs <- sampleIO 
                                   $ fmap (Prelude.map fst) 
                                   $ explicitPopulation 
                                   $ withParticles numParticles a
-                              return (nub xs)
+                              return (sort $ nub xs)
 
 mcExpectation :: Int -> MCIO Double -> IO Double
 mcExpectation numParticles = sampleIO . popAvg id . withParticles numParticles
@@ -108,7 +108,7 @@ data DiagnosticInfoMC x y = DiagnosticInfoMC {
 instance Show (DiagnosticInfoMC x y) where
   show DiagnosticInfoMC{..} = "equilibrium \n" ++ (show equilibrium) ++ "\n player \n" ++ (show player) ++ "\n optimalPayoff \n" ++ (show optimalPayoff) ++ "\n payoff \n" ++ (show payoff)
 
-decisionMC :: (Eq x) 
+decisionMC :: (Eq x, Ord x) 
            => {- numParticles: -} Int
            -> {- epsilon: -} Double
            -> {- name: -} String

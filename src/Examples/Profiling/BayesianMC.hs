@@ -1,4 +1,6 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE GADTs #-}
 
 module Examples.Profiling.BayesianMC where
 
@@ -6,25 +8,47 @@ module Examples.Profiling.BayesianMC where
 import Control.Arrow (Kleisli (..))
 import Control.Monad.Bayes.Class
 
-import OpenGames.Engine.OpticClass ( Optic(lens) )
+import OpenGames.Engine.OpticClass ( Optic(lens), void )
 import OpenGames.Engine.OpenGames
 import OpenGames.Engine.BayesianMC
 import OpenGames.Engine.TLL
-import OpenGames.Engine.Diagnostics
+import OpenGames.Engine.Diagnostics hiding (equilibrium)
 import OpenGames.Preprocessor
 
 
 particles = 1000 :: Int
 epsilon = 0.1 :: Double
 
-s :: (Monad m) => Kleisli m Int Int
+s :: Kleisli MCIO  Int Int
 s = Kleisli pure
 
 coordinate :: Int -> Int -> Double
 coordinate x y = - fromIntegral (abs (x - y))
 
+profile = s ::- s ::- s ::- s ::- s ::- s ::- s ::- Nil
+
+result =
+  let r1 ::- r2 ::- r3 ::- r4 ::- r5 ::- r6 ::- r7 ::- Nil = evaluate profiling_game profile void
+      in do
+          ls <- sequence [r1,r2,r3,r4,r5,r6,r7]
+          print $ map equilibrium $ concat ls
 
 
+profiling_game
+  :: OpenGame
+       (StatefulKleisliOptic MCIO)
+       (StatefulKleisliContext MCIO)
+       '[Kleisli MCIO Int Int, Kleisli MCIO Int Int, Kleisli MCIO Int Int,
+         Kleisli MCIO Int Int, Kleisli MCIO Int Int, Kleisli MCIO Int Int,
+         Kleisli MCIO Int Int]
+       '[IO [DiagnosticInfoMC Int Int], IO [DiagnosticInfoMC Int Int],
+         IO [DiagnosticInfoMC Int Int], IO [DiagnosticInfoMC Int Int],
+         IO [DiagnosticInfoMC Int Int], IO [DiagnosticInfoMC Int Int],
+         IO [DiagnosticInfoMC Int Int]]
+       ()
+       ()
+       ()
+       ()
 profiling_game = [opengame|
   inputs: ;
   :-----:
