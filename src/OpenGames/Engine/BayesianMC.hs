@@ -20,7 +20,8 @@ import Data.Utils
 import OpenGames.Engine.OpticClass
 import OpenGames.Engine.OpenGames hiding (lift)
 import OpenGames.Engine.TLL
-import OpenGames.Engine.BayesianGames (Payoff)
+
+type Payoff = Double
 
 data StatefulKleisliOptic m s t a b where
     StatefulKleisliOptic :: (s -> m (z, a))

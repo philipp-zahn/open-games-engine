@@ -48,8 +48,8 @@ class Precontext c where
 
 class (Optic o, Precontext c) => Context c o where
   cmap :: o s1 t1 s2 t2 -> o a1 b1 a2 b2 -> c s1 t1 a2 b2 -> c s2 t2 a1 b1
-  (//) :: (Show s1) => o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
-  (\\) :: (Show s2) => o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
+  (//) :: o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
+  (\\) :: o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
 
 -- (\\) is derivable from (//) using
 -- l \\ c = l // (cmap (lift swap swap) (lift swap swap) c)
@@ -88,7 +88,7 @@ instance Optic StochasticStatefulOptic where
           u (Right z2) b = u2 z2 b
 
 data StochasticStatefulContext s t a b where
-  StochasticStatefulContext :: (Show z) => Stochastic (z, s) -> (z -> a -> StateT Vector Stochastic b) -> StochasticStatefulContext s t a b
+  StochasticStatefulContext ::  Stochastic (z, s) -> (z -> a -> StateT Vector Stochastic b) -> StochasticStatefulContext s t a b
 
 instance Precontext StochasticStatefulContext where
   void = StochasticStatefulContext (return ((), ())) (\() () -> return ())
@@ -139,7 +139,7 @@ instance Optic StochasticOptic where
           u (Right z2) b = u2 z2 b
 
 data StochasticContext s t a b where
-  StochasticContext :: (Show z) => Stochastic (z, s) -> (z -> a -> Stochastic b) -> StochasticContext s t a b
+  StochasticContext ::  Stochastic (z, s) -> (z -> a -> Stochastic b) -> StochasticContext s t a b
 
 instance Precontext StochasticContext where
   void = StochasticContext (return ((), ())) (\() () -> return ())
@@ -192,7 +192,7 @@ instance Optic MonadOptic where
           u (Right z2) b = u2 z2 b
 
 data MonadContext s t a b where
-  MonadContext :: (Show z) => IO (z, s) -> (z -> a -> StateT Vector IO b) -> MonadContext s t a b
+  MonadContext ::  IO (z, s) -> (z -> a -> StateT Vector IO b) -> MonadContext s t a b
 
 instance Precontext MonadContext where
   void = MonadContext (return ((), ())) (\() () -> return ())
@@ -229,7 +229,7 @@ instance Monad m => Optic (MonadOpticLearning m) where
           u (z1, z2) (b1, b2) = do {t1 <- u1 z1 b1; t2 <- u2 z2 b2; return (t1, t2)}
 
 data MonadContextLearning m s t a b where
-  MonadContextLearning :: (Monad m, Show z) => m (z, s) -> (z -> a -> m b) -> MonadContextLearning m s t a b
+  MonadContextLearning :: Monad m => m (z, s) -> (z -> a -> m b) -> MonadContextLearning m s t a b
 
 instance Monad m => Precontext (MonadContextLearning m) where
   void = MonadContextLearning (return ((), ())) (\() () -> return ())

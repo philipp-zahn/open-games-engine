@@ -6,7 +6,7 @@ module Examples.Profiling.BayesianMC where
 import Control.Arrow (Kleisli (..))
 import Control.Monad.Bayes.Class
 
-import OpenGames.Engine.OpticClass
+import OpenGames.Engine.OpticClass ( Optic(lens) )
 import OpenGames.Engine.OpenGames
 import OpenGames.Engine.BayesianMC
 import OpenGames.Engine.TLL

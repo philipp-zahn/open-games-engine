@@ -1,30 +1,7 @@
 {-# LANGUAGE ExplicitNamespaces #-}
 
 module OpenGames.Engine.Engine
-  ( decision
-  , decisionNoObs
-  , forwardFunction
-  , backwardFunction
-  , nature
-  , natureEndInput
-  , natureDraw
-  , liftStochasticForward
-  , StochasticStatefulBayesianOpenGame(..)
-  , Agent(..)
-  , Payoff(..)
-  , dependentDecision
-  , dependentRoleDecision
-  , dependentEpsilonDecision
-  , fromFunctions
-  , fromLens
-  , uniformDist
-  , distFromList
-  , pureAction
-  , playDeterministically
-  , discount
-  , addPayoffs
-  , addRolePayoffs
-  , DiagnosticInfoBayesian(..)
+  ( DiagnosticInfoBayesian(..)
   , generateOutput
   , generateOutputString
   , generateIsEq
@@ -39,7 +16,6 @@ module OpenGames.Engine.Engine
   , reindex
   , (>>>)
   , (&&&)
-  , (+++)
   , Stochastic(..)
   , Vector(..)
   , StochasticStatefulOptic(..)
@@ -70,8 +46,6 @@ module OpenGames.Engine.Engine
   ) where
 
 -- | File organizes the imports of the engine to streamline the import of relevant functionality
-import OpenGames.Engine.AtomicGames
-import OpenGames.Engine.BayesianGames hiding (liftStochastic)
 import OpenGames.Engine.OpenGames
 import OpenGames.Engine.OpticClass
 import OpenGames.Engine.Diagnostics

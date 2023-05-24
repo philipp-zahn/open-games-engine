@@ -41,7 +41,7 @@ reindex v u g = OpenGame {
                                                   +:+ evaluate h a' (cmap (play g a) identity c)
 }
 
-(&&&) :: (Optic o, Context c o, Unappend a, Unappend b, Show x, Show x')
+(&&&) :: (Optic o, Context c o, Unappend a, Unappend b)
       => OpenGame o c a b x s y r -> OpenGame o c a' b' x' s' y' r'
       -> OpenGame o c (a +:+ a') (b +:+ b') (x, x') (s, s') (y, y') (r, r')
 (&&&) g h = OpenGame {
