@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module OpenGames.Engine.BayesianMC where
 
@@ -103,6 +104,9 @@ data DiagnosticInfoMC x y = DiagnosticInfoMC {
   , state :: x
   -- , unobservedState :: ?
 }
+
+instance Show (DiagnosticInfoMC x y) where
+  show DiagnosticInfoMC{..} = "equilibrium \n" ++ (show equilibrium) ++ "player \n" ++ (show player) ++ "optimalPayoff \n" ++ (show optimalPayoff) ++ "payoff \n" ++ (show payoff)
 
 decisionMC :: (Eq x) 
            => {- numParticles: -} Int
