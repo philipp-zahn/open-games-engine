@@ -106,7 +106,7 @@ data DiagnosticInfoMC x y = DiagnosticInfoMC {
 }
 
 instance Show (DiagnosticInfoMC x y) where
-  show DiagnosticInfoMC{..} = "equilibrium \n" ++ (show equilibrium) ++ "player \n" ++ (show player) ++ "optimalPayoff \n" ++ (show optimalPayoff) ++ "payoff \n" ++ (show payoff)
+  show DiagnosticInfoMC{..} = "equilibrium \n" ++ (show equilibrium) ++ "\n player \n" ++ (show player) ++ "\n optimalPayoff \n" ++ (show optimalPayoff) ++ "\n payoff \n" ++ (show payoff)
 
 decisionMC :: (Eq x) 
            => {- numParticles: -} Int
