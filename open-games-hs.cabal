@@ -33,6 +33,7 @@ library
       OpenGames.Preprocessor.Parser
       OpenGames.Preprocessor.RuntimeAST
       Examples.Profiling.BayesianMC
+      Examples.Profiling.BayesianMCDebugging
   other-modules:
       Data.Utils
       OpenGames.Engine.BayesianMCDebugging

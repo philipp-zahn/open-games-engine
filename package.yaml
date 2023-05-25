@@ -26,6 +26,7 @@ library:
     - OpenGames.Preprocessor.Parser
     - OpenGames.Preprocessor.RuntimeAST
     - Examples.Profiling.BayesianMC
+    - Examples.Profiling.BayesianMCDebugging
 
 dependencies:
     - base >=4.7 && <5
