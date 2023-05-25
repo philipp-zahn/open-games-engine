@@ -13,6 +13,7 @@ library:
   source-dirs: src
   exposed-modules:
     - OpenGames.Engine.BayesianMC
+    - OpenGames.Engine.BayesianMCDebugging
     - OpenGames.Engine.Diagnostics
     - OpenGames.Engine.Engine
     - OpenGames.Engine.OpenGames
@@ -26,7 +27,6 @@ library:
     - OpenGames.Preprocessor.Parser
     - OpenGames.Preprocessor.RuntimeAST
     - Examples.Profiling.BayesianMC
-    - Examples.Profiling.BayesianMCDebugging
 
 dependencies:
     - base >=4.7 && <5

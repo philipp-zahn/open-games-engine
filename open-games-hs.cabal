@@ -20,6 +20,7 @@ extra-source-files:
 library
   exposed-modules:
       OpenGames.Engine.BayesianMC
+      OpenGames.Engine.BayesianMCDebugging
       OpenGames.Engine.Diagnostics
       OpenGames.Engine.Engine
       OpenGames.Engine.OpenGames
@@ -33,10 +34,8 @@ library
       OpenGames.Preprocessor.Parser
       OpenGames.Preprocessor.RuntimeAST
       Examples.Profiling.BayesianMC
-      Examples.Profiling.BayesianMCDebugging
   other-modules:
       Data.Utils
-      OpenGames.Engine.BayesianMCDebugging
       OpenGames.Engine.ExternalEnvironment
       OpenGames.Engine.IOGames
       Paths_open_games_hs
