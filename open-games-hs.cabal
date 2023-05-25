@@ -35,6 +35,7 @@ library
       Examples.Profiling.BayesianMC
   other-modules:
       Data.Utils
+      OpenGames.Engine.BayesianMCDebugging
       OpenGames.Engine.ExternalEnvironment
       OpenGames.Engine.IOGames
       Paths_open_games_hs

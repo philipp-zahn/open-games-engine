@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module OpenGames.Engine.BayesianMC where
+module OpenGames.Engine.BayesianMCDebugging where
 
 import Data.HashMap as HM
 import Data.List (nub, maximumBy, sort)
@@ -14,6 +14,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.State hiding (state)
 
 import Control.Monad.Bayes.Class
+import Control.Monad.Bayes.Sampler.Strict
 import Control.Monad.Bayes.Population
 import Control.Monad.Bayes.Sampler.Strict
 
@@ -23,6 +24,7 @@ import OpenGames.Engine.OpenGames hiding (lift)
 import OpenGames.Engine.TLL
 
 type Payoff = Double
+
 
 data StatefulKleisliOptic m s t a b where
     StatefulKleisliOptic :: (s -> m (z, a))
@@ -121,17 +123,11 @@ decisionMC numParticles epsilon name options = OpenGame {
                              u () r = modify (adjustOrAdd (+ r) r name)
                             in StatefulKleisliOptic v u,
   evaluate = \(a {- :: Kleisli MCIO x y -} ::- Nil) 
-              (StatefulKleisliContext h {- MCIO (z, x) -} 
+              c@(StatefulKleisliContext h {- MCIO (z, x) -} 
                                       k {- :: z -> y -> StateT Vector MCIO Payoff -}) ->
-    let runInState {- :: x -> y -> MCIO Payoff -} x y
-          = do { (z, x') <- h;
-                 condition (x == x');
-                 (r, v) <- runStateT (k z y) HM.empty;
-                 return $ r + HM.findWithDefault 0.0 name v
-               }
-     in do { xs <- mcSupport numParticles (fmap snd h);
-             sequence [ do { strategyExpectation <- mcExpectation numParticles (runKleisli a x >>= runInState x);
-                             moveExpectations <- sequence [ do { e <- mcExpectation numParticles (runInState x y);
+     do { xs <- mcSupport numParticles (fmap snd h);
+             sequence [ do { strategyExpectation <- sampleIO $ runInStateExpectation c numParticles name x (runKleisli a x);
+                             moveExpectations <- sequence [ do { e <- sampleIO $ runInStateExpectation c numParticles name x (pure y);
                                                                  return (y, e)
                                                                }
                                                           | y <- options x ];
@@ -142,7 +138,6 @@ decisionMC numParticles epsilon name options = OpenGame {
                                 optimalMove = y,
                                 strategy = runKleisli a x,
                                 optimalPayoff = ky,
-                                context = runInState x,
                                 payoff = strategyExpectation,
                                 state = x
                              }
@@ -151,6 +146,8 @@ decisionMC numParticles epsilon name options = OpenGame {
         } ::- Nil
 }
 
+
+
 runInState :: Eq x => StatefulKleisliContext MCIO x () y Double -> String -> x -> y -> MCIO Double
 runInState (StatefulKleisliContext h k) {- :: x -> y -> MCIO Payoff -} name x y
           = do { (z, x') <- h;
@@ -158,6 +155,23 @@ runInState (StatefulKleisliContext h k) {- :: x -> y -> MCIO Payoff -} name x y
                  (r, v) <- runStateT (k z y) HM.empty;
                  return $ r + HM.findWithDefault 0.0 name v
                }
+
+runInStateExpectation :: Eq x => StatefulKleisliContext MCIO x () y Double -> Int -> String -> x -> MCIO y -> SamplerIO Double
+runInStateExpectation (StatefulKleisliContext h k) numParticles name x yy
+  = let conditioned = do (z, x') <- h
+                         condition (x == x')
+                         y <- yy
+                         (r, v) <- runStateT (k z y) HM.empty
+                         return $ r + HM.findWithDefault 0.0 name v
+        total       = do (z, x') <- h
+                         y <- yy
+                         (r, v) <- runStateT (k z y) HM.empty
+                         return $ r + HM.findWithDefault 0.0 name v
+        weightedSum = sum . Prelude.map (uncurry (*))
+     in do conditionedParticles <- explicitPopulation $ withParticles numParticles conditioned
+           totalParticles <- explicitPopulation $ withParticles numParticles total
+           return $ weightedSum conditionedParticles / weightedSum totalParticles
+  
 testDistribution :: MCIO (Bool,Bool)
 testDistribution = uniformD [(True,True),(False,False)]
 
@@ -168,4 +182,21 @@ testContext :: StatefulKleisliContext MCIO Bool () Bool Double
 testContext = StatefulKleisliContext testDistribution testContinuation
 
 testResult x y = 
-  mcExpectation 1000 $ runInState testContext "test" x  y 
+  mcExpectation 1000 $ runInState testContext "test" x  y
+
+test :: Population SamplerIO Double
+test = do x <- uniformD [0,1]
+          condition (x == 1) 
+          return x
+          
+mcExpectation2 :: Population SamplerIO Double -> IO Double
+mcExpectation2 a = sampleIO $ do xs <- explicitPopulation $ withParticles 1000 a
+                                 return $ sum $ Prelude.map (uncurry (*)) xs
+
+testExpectation :: SamplerIO Double
+testExpectation = let test2 = uniformD [0,1]
+                   in do conditionParticles <- explicitPopulation $ withParticles 1000 test
+                         allParticles <- explicitPopulation $ withParticles 1000 test2
+                         let conditionWeight = sum $ Prelude.map (uncurry (*)) conditionParticles
+                         let totalWeight = sum $ Prelude.map (uncurry (*)) allParticles
+                         return $ conditionWeight / totalWeight
