@@ -5,7 +5,7 @@
 
 module OpenGames.Engine.BayesianMCDebugging where
 
-import Data.HashMap as HM
+import Data.HashMap as HM hiding (map)
 import Data.List (nub, maximumBy, sort)
 import Data.Ord (comparing)
 
@@ -156,21 +156,17 @@ runInState (StatefulKleisliContext h k) {- :: x -> y -> MCIO Payoff -} name x y
                  return $ r + HM.findWithDefault 0.0 name v
                }
 
-runInStateExpectation :: Eq x => StatefulKleisliContext MCIO x () y Double -> Int -> String -> x -> MCIO y -> SamplerIO Double
+runInStateExpectation :: (Eq x) => StatefulKleisliContext MCIO x () y Double
+                                 -> Int -> String -> x -> MCIO y -> SamplerIO Double
 runInStateExpectation (StatefulKleisliContext h k) numParticles name x yy
   = let conditioned = do (z, x') <- h
                          condition (x == x')
                          y <- yy
                          (r, v) <- runStateT (k z y) HM.empty
                          return $ r + HM.findWithDefault 0.0 name v
-        total       = do (z, x') <- h
-                         y <- yy
-                         (r, v) <- runStateT (k z y) HM.empty
-                         return $ r + HM.findWithDefault 0.0 name v
-        weightedSum = sum . Prelude.map (uncurry (*))
-     in do conditionedParticles <- explicitPopulation $ withParticles numParticles conditioned
-           totalParticles <- explicitPopulation $ withParticles numParticles total
-           return $ weightedSum conditionedParticles / weightedSum totalParticles
+     in do particles <- explicitPopulation $ withParticles numParticles conditioned
+           return $ weightedSumNormalised particles
+  where weightedSumNormalised xs = sum (map (uncurry (*)) xs) / sum (map snd xs)
   
 testDistribution :: MCIO (Bool,Bool)
 testDistribution = uniformD [(True,True),(False,False)]

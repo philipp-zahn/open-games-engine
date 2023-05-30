@@ -151,17 +151,14 @@ decisionMC numParticles epsilon name options = OpenGame {
         } ::- Nil
 }
 
-runInStateExpectation :: (Eq x) => StatefulKleisliContext MCIO x () y Double
-                                 -> Int -> String -> x -> MCIO y -> SamplerIO Double
-runInStateExpectation (StatefulKleisliContext h k) numParticles name x yy
-  = let conditioned = do (z, x') <- h
-                         condition (x == x')
-                         y <- yy
-                         (r, v) <- runStateT (k z y) HM.empty
-                         return $ r + HM.findWithDefault 0.0 name v
-     in do particles <- explicitPopulation $ withParticles numParticles conditioned
-           return $ weightedSumNormalised particles
-  where weightedSumNormalised xs = sum (map (uncurry (*)) xs) / sum (map snd xs)testDistribution :: MCIO (Bool,Bool)
+runInState :: Eq x => StatefulKleisliContext MCIO x () y Double -> String -> x -> y -> MCIO Double
+runInState (StatefulKleisliContext h k) {- :: x -> y -> MCIO Payoff -} name x y
+          = do { (z, x') <- h;
+                 condition (x == x');
+                 (r, v) <- runStateT (k z y) HM.empty;
+                 return $ r + HM.findWithDefault 0.0 name v
+               }
+testDistribution :: MCIO (Bool,Bool)
 testDistribution = uniformD [(True,True),(False,False)]
 
 testContinuation :: Bool -> Bool -> StateT Vector MCIO Double
