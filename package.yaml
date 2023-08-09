@@ -53,6 +53,7 @@ dependencies:
     - random
     - vector
     - criterion
+    - monad-parallel
 
 
 

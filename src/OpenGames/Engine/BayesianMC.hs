@@ -13,6 +13,8 @@ import Control.Arrow
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State hiding (state)
 
+import qualified Control.Monad.Parallel as MP
+
 import Control.Monad.Bayes.Class
 import Control.Monad.Bayes.Population
 import Control.Monad.Bayes.Sampler.Strict
@@ -130,8 +132,8 @@ decisionMC numParticles epsilon name options = OpenGame {
                  return $ r + HM.findWithDefault 0.0 name v
                }
      in do { xs <- mcSupport numParticles (fmap snd h);
-             sequence [ do { strategyExpectation <- mcExpectation numParticles (runKleisli a x >>= runInState x);
-                             moveExpectations <- sequence [ do { e <- mcExpectation numParticles (runInState x y);
+             MP.sequence [ do { strategyExpectation <- mcExpectation numParticles (runKleisli a x >>= runInState x);
+                             moveExpectations <- MP.sequence [ do { e <- mcExpectation numParticles (runInState x y);
                                                                  return (y, e)
                                                                }
                                                           | y <- options x ];
