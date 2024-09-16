@@ -3,7 +3,7 @@
 This tutorial is about how to install the tools to use open games and how to master the language
 of open games to write powerful games and analyze them.
 
-This repo is a refactored and simplified implementation on the basis of [this](https://github.com/jules-hedges/open-game-engine) version by Jules Hedges.
+This repo is a refactored and simplified implementation on the basis of [this](https://github.com/jules-hedges/open-games-hs) version by Jules Hedges.
 
 If you have questions, drop me (Philipp) a [mail](mailto:philipp.zahn@unisg.ch)!
 
@@ -31,9 +31,9 @@ This [tutorial](https://github.com/philipp-zahn/open-games-hs/blob/master/Tutori
 # How to install and run open-games-hs
 
 Open-games-hs requires stack and a text editor, for the text editor, it is very likely
-that your existing one already supports haskell. If you do not have one I recommend starting with [VSCode][VSCODE].
+that your existing one already supports haskell. If you do not have one I recommend starting with [VSCode](https://code.visualstudio.com/download).
 
-You can install stack following the instructions here: (https://docs.haskellstack.org/en/stable/install_and_upgrade/)[https://docs.haskellstack.org/en/stable/install_and_upgrade/]
+You can install stack following the instructions here: [https://docs.haskellstack.org/en/stable/install_and_upgrade/](https://docs.haskellstack.org/en/stable/install_and_upgrade/)
 
 Stack will be responsible for installing haskell, the Open-games-hs framework and its dependencies.
 
