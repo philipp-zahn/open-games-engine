@@ -386,8 +386,7 @@ After all that work, what can you actually do with a game that is represented?
         NEWGAME:
         ----Analytics end----
 
-
-and a message like this, if it is not:
+   and a message like this, if it is not:
 
         ----Analytics begin----
         Strategies are NOT in equilibrium. Consider the following profitable deviations:
@@ -400,9 +399,9 @@ and a message like this, if it is not:
         Observable State: ()
         Unobservable State: "((),())
 
-As you can see, the message contains information about the particular aspects of a specific strategy. It outputs such information for the whole strategy tuple.
+   As you can see, the message contains information about the particular aspects of a specific strategy. It outputs such information for the whole strategy tuple.
 
-If your game depends on outside parameters, you can check for a whole class of parameters
+   If your game depends on outside parameters, you can check for a whole class of parameters
 
 1. You can simulate the outcomes for a game given a strategy. And of course you can do all sorts of illustrations with that like simulating the outcome for a specific game.
 
