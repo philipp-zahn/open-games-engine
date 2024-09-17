@@ -433,7 +433,7 @@ For each player making a move at some point in the game, you need to supply a st
 
      Kleisli Stochastic a b
 
-This type is from a relatively advanced part of Haskell, called `Arrows` (see [here](/https://www.haskell.org/arrows/) for more information). You do not need to worry about it to much.
+This type is from a relatively advanced part of Haskell, called `Arrows` (see [here](https://www.haskell.org/arrows/) for more information). You do not need to worry about it to much.
 
 The way to read this type is as the following computation:
 
