@@ -10,7 +10,8 @@ module Examples.Governance.Monitoring
 import OpenGames.Engine.Engine
 import OpenGames.Preprocessor
 
-
+import Data.List (delete)
+import Numeric.Probability.Distribution (uniform)
 -------------------------------
 -- 1 Helper functions and setup
 -------------------------------
@@ -52,6 +53,21 @@ assignWater3 (startLevel, farmerMove, monitorWorks)
       (_, Shirk) -> (w, 0, startLevel - w)
   where w = farmerWater startLevel farmerMove
 
+assignWaterNoTax :: (Double, FarmerMove, MonitorMove) -> (Double, Double)
+assignWaterNoTax (startLevel, farmerMove, monitorWorks)
+  = case (farmerMove, monitorWorks) of
+      (Crack, Work) -> (yield, startLevel - yield)
+      (Flood, Work) -> ((1 - punishmentRate)*yield, startLevel - (1 - punishmentRate)*yield)
+      (_, Shirk) -> (yield, startLevel - yield)
+  where yield = farmerWater startLevel farmerMove
+        punishmentRate = 0.65 
+
+randomOrder :: Stochastic (String,String,String)
+randomOrder = do
+       p1 <- uniform lst
+       return (p1,((lst' p1) !! 0),(lst' p1) !! 1)
+     where lst = ["farmerA","farmerB","farmerC"]
+           lst' x = delete x lst
 
 -- Action spaces
 choiceSetFarmer = [Crack, Flood]
@@ -172,7 +188,7 @@ irrigationStepMonitor3 = [opengame|
    returns   :      ;
   |]
 
--- An irrigation game with three farmers; Figure 4B
+-- An irrigation game with three farmers an monitoring; Figure 4C
 irrigationMonitoring = [opengame|
    inputs    :      ;
    feedback  :      ;
@@ -209,8 +225,83 @@ irrigationMonitoring = [opengame|
   |]
 
 
+-- Rotating roles
+irrigationStepRoleDep =
+ [opengame|
+   inputs    :  name, startLevel, monitorWorks    ;
+   feedback  :     ;
+
+   :----------------------------:
+   inputs    :  name   ;
+   feedback  :      ;
+   operation : dependentRoleDecision (const choiceSetFarmer);
+   outputs   : farmerMove ;
+   returns   : farmerWater     ;
+
+   inputs    :  startLevel, farmerMove, monitorWorks   ;
+   feedback  :      ;
+   operation : forwardFunction assignWaterNoTax ;
+   outputs   :  farmerWater, downstreamWater;
+   returns   :      ;
+
+   :----------------------------:
+
+   outputs   : downstreamWater  ;
+   returns   :      ;
+  |]
+
+-- An irrigation game with three farmers an monitoring; Figure 4C
+irrigationRandomRole = [opengame|
+   inputs    :      ;
+   feedback  :      ;
+
+   :----------------------------:
+
+   inputs    :  ;
+   feedback  :  ;
+   operation : nature randomOrder ;
+   outputs   : m, p2, p3;
+   returns   : ;
+
+   inputs    : m ;
+   feedback  :      ;
+   operation : dependentRoleDecision  (const choiceSetMonitoring) ;
+   outputs   : monitorWorks;
+   returns   : monitorPayoff 0 0 0 monitorWorks;
+
+   inputs    : p2, 10, monitorWorks    ;
+   feedback  : monitorWater1    ;
+   operation : irrigationStepRoleDep ;
+   outputs   : levelAfter1 ;
+   returns   : ;
+
+   inputs    : p3, levelAfter1, monitorWorks    ;
+   feedback  : monitorWater2    ;
+   operation : irrigationStepRoleDep ;
+   outputs   : levelAfter2 ;
+   returns   : ;
+
+   inputs    : m,  levelAfter2, monitorWorks    ;
+   feedback  : monitorWater3    ;
+   operation : irrigationStepRoleDep ;
+   outputs   : levelAfter3 ;
+   returns   : ;
+   :----------------------------:
+
+   outputs   :      ;
+   returns   :      ;
+  |]
+
+
 
   {-
+
+  Block ["name" :: Agent, "startLevel", "monitorWorks"] []
+  [Line Nothing ["(name,())"] [] "roleDecision [Crack, Flood]" ["farmerMove"] ["farmerWater"],
+   Line Nothing ["startLevel", "farmerMove", "monitorWorks"] ["()"] "fromFunctions assignWaterNoTax id" ["farmerWater", "downstreamWater"] ["()"]]
+    ["downstreamWater"] []
+
+
 -- An irrigation game with three farmers; Figure 4B
 irrigationMonitoring = [opengame|
    inputs    :      ;
