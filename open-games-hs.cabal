@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -49,6 +49,7 @@ library
       Examples.Markov.TestSimpleMonteCarlo.Continuation
   other-modules:
       Data.Utils
+      Examples.Governance.Monitoring
       Examples.Markov.NStageMarkov
       Examples.Staking.AndGateMarkov
       Examples.Staking.AndGateMarkovMC
