@@ -74,6 +74,8 @@ choiceSetFarmer = [Crack, Flood]
 
 choiceSetMonitoring = [Work,Shirk]
 
+-- Payoffs
+
 monitorPayoff :: MonitorMove -> Rational
 monitorPayoff Work  = -1
 monitorPayoff Shirk = 0
@@ -82,6 +84,10 @@ punisher :: FarmerMove -> MonitorMove -> Rational
 punisher _ Shirk    = 0
 punisher Crack Work = 0
 punisher Flood Work = 3
+
+monitorPayoff2 :: Double -> Double -> Double -> MonitorMove -> Double
+monitorPayoff2 wage _   c Work  =  wage - c
+monitorPayoff2 _    pun c Shirk = - pun
 
 
 -- Parameters
@@ -224,7 +230,8 @@ irrigationMonitoring = [opengame|
    returns   :      ;
   |]
 
-
+noInput = ()
+  
 -- Rotating roles
 irrigationStepRoleDep =
  [opengame|
@@ -232,7 +239,7 @@ irrigationStepRoleDep =
    feedback  :     ;
 
    :----------------------------:
-   inputs    :  name   ;
+   inputs    : name,noInput    ;
    feedback  :      ;
    operation : dependentRoleDecision (const choiceSetFarmer);
    outputs   : farmerMove ;
@@ -250,6 +257,8 @@ irrigationStepRoleDep =
    returns   :      ;
   |]
 
+
+
 -- An irrigation game with three farmers an monitoring; Figure 4C
 irrigationRandomRole = [opengame|
    inputs    :      ;
@@ -263,11 +272,11 @@ irrigationRandomRole = [opengame|
    outputs   : m, p2, p3;
    returns   : ;
 
-   inputs    : m ;
+   inputs    : (m,noInput) ;
    feedback  :      ;
    operation : dependentRoleDecision  (const choiceSetMonitoring) ;
    outputs   : monitorWorks;
-   returns   : monitorPayoff 0 0 0 monitorWorks;
+   returns   : monitorPayoff2 0 0 0 monitorWorks;
 
    inputs    : p2, 10, monitorWorks    ;
    feedback  : monitorWater1    ;
@@ -281,7 +290,7 @@ irrigationRandomRole = [opengame|
    outputs   : levelAfter2 ;
    returns   : ;
 
-   inputs    : m,  levelAfter2, monitorWorks    ;
+   inputs    : m, levelAfter2, monitorWorks    ;
    feedback  : monitorWater3    ;
    operation : irrigationStepRoleDep ;
    outputs   : levelAfter3 ;
@@ -293,8 +302,7 @@ irrigationRandomRole = [opengame|
   |]
 
 
-
-  {-
+{-
 
   Block ["name" :: Agent, "startLevel", "monitorWorks"] []
   [Line Nothing ["(name,())"] [] "roleDecision [Crack, Flood]" ["farmerMove"] ["farmerWater"],
