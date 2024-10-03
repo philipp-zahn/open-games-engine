@@ -302,58 +302,77 @@ irrigationRandomRole = [opengame|
   |]
 
 
-{-
-
-  Block ["name" :: Agent, "startLevel", "monitorWorks"] []
-  [Line Nothing ["(name,())"] [] "roleDecision [Crack, Flood]" ["farmerMove"] ["farmerWater"],
-   Line Nothing ["startLevel", "farmerMove", "monitorWorks"] ["()"] "fromFunctions assignWaterNoTax id" ["farmerWater", "downstreamWater"] ["()"]]
-    ["downstreamWater"] []
-
-
--- An irrigation game with three farmers; Figure 4B
-irrigationMonitoring = [opengame|
-   inputs    :      ;
-   feedback  :      ;
-
-   :----------------------------:
-   inputs    :  ;
-   feedback  :  ;
-   operation : irrigationNoMonitoring ;
-   outputs   :  ;
-   returns   :  ;
-
-   inputs    : "farmer3",  levelAfter2    ;
-   feedback  :      ;
-   operation : dependentDecision "farmer3" (const choiceSetMonitoring);
-   outputs   : monitorDecision ;
-   returns   : payoffMonitor monitorDecision;
-   :----------------------------:
-
-   outputs   :      ;
-   returns   :      ;
-  |]
-
-
-
 
   
+-------------
+-- Strategies
+--
+
+-- stratWork :: Kleisli Stochastic Double FarmerMove
+stratWork,stratShirk :: Kleisli Stochastic a MonitorMove
+stratWork = pureAction Work
+stratShirk = pureAction Shirk
+
+stratCrack,stratFlood :: Kleisli Stochastic a FarmerMove
+stratCrack = pureAction Crack
+stratFlood = pureAction Flood
+
+stratTupleNoMonitoring =
+  stratFlood
+  ::- stratFlood
+  ::- stratFlood
+  ::- Nil
+
+stratTupleNoMonitoring2 =
+  stratCrack
+  ::- stratFlood
+  ::- stratFlood
+  ::- Nil
+
+stratTupleMonitoring =
+  stratWork
+  ::- stratCrack
+  ::- stratFlood
+  ::- stratFlood
+  ::- Nil
+
+stratTupleMonitoring2 =
+  stratShirk
+  ::- stratFlood
+  ::- stratFlood
+  ::- stratFlood
+  ::- Nil
 
 
--- | The same decision in the reduced style, i.e. ignoring empty fields
--- Requires a list of actions, and a payoff function
-singleDecisionReduced actionSpace payoffFunction = [opengame|
-   operation : dependentDecision "player1" (const actionSpace);
-   outputs   : decisionPlayer1 ;
-   returns   : payoffFunction decisionPlayer1     ;
-  |]
+
+stratTupleRandomRole =
+  stratWork
+  ::- stratCrack
+  ::- stratCrack
+  ::- stratCrack
+  ::- Nil
+
+stratTupleRandomRole2 =
+  stratWork
+  ::- stratCrack
+  ::- stratCrack
+  ::- stratFlood
+  ::- Nil
 
 
+--------------------
+-- equilibrium tests
 
-irrigationStep = reindex (\x -> (x, ())) ((reindex (\x -> ((), x)) ((fromFunctions (\x -> x) (\(name, startLevel, farmerMove) -> ())) >>> (reindex (\a1 -> a1) (reindex (\x -> (x, ())) ((reindex (\x -> ((), x)) ((fromFunctions (\(name, startLevel) -> ((name, startLevel), (name, [Crack, Flood], ()))) (\((name, startLevel, farmerMove), ()) -> (name, startLevel, farmerMove))) >>> (reindex (\x -> ((), x)) ((fromFunctions (\x -> x) (\x -> x)) &&& ((dependentDecision)))))) >>> (fromFunctions (\((name, startLevel), farmerMove) -> (name, startLevel, farmerMove)) (\(name, startLevel, farmerMove) -> ((name, startLevel, farmerMove), farmerWater startLevel farmerMove)))))))) >>> (fromLens (\(name, startLevel, farmerMove) -> startLevel - farmerWater startLevel farmerMove) (curry (\((name, startLevel, farmerMove), ()) -> (name, startLevel, farmerMove)))))
+eqIrrigationNoMonitoring strat = generateIsEq $ evaluate irrigationNoMonitoring strat void
 
-irrigationNoMonitoringSrc = Block [] []
-  [Line Nothing ["\"farmer1\"", "10"] [] "irrigationStep" ["levelAfter1"] [],
-   Line Nothing ["\"farmer2\"", "levelAfter1"] [] "irrigationStep" ["levelAfter2"] [],
-   Line Nothing ["\"farmer3\"", "levelAfter2"] [] "irrigationStep" ["levelAfter3"] []]
-  [] []
---}
+eqIrrigationMonitoring strat =  generateIsEq $ evaluate irrigationMonitoring strat void
+
+eqIrrigationRandom strat = generateIsEq $ evaluate irrigationRandomRole strat void
+
+{-
+eqIrrigationNoMonitoring stratTupleNoMonitoring
+
+eqIrrigationRandom stratTupleRandomRole
+
+eqIrrigationRandom stratTupleRandomRole2
+-}

@@ -49,6 +49,7 @@ library
       Examples.Markov.TestSimpleMonteCarlo.Continuation
   other-modules:
       Data.Utils
+      Examples.Governance.InstitutionProcess
       Examples.Governance.Monitoring
       Examples.Markov.NStageMarkov
       Examples.Staking.AndGateMarkov
