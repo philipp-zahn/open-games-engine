@@ -41,7 +41,7 @@ print the result of executing an equilibrium check on a very simple game. The re
 to use the open-games framework in order to design and analyse games interactively using `ghci`. To invoke it, use
 `stack ghci` and that will start a new interactive session.
 
-### Installing in OSx
+### Installing on OSx
 
 It's also possible to get `ghcup` the package manager for haskell using (brew)[https://brew.sh/], the OSx package manager.
 First, make sure you have brew installed in your system. Then you can use it to fetch `ghcup`:
