@@ -27,13 +27,12 @@ swap out or parameterize.
 
 This [tutorial](https://github.com/philipp-zahn/open-games-hs/blob/master/Tutorial/TUTORIAL.md) shows how to use the software for modelling.
 
-
 # How to install and run open-games-hs
 
 Open-games-hs requires stack and a text editor, for the text editor, it is very likely
 that your existing one already supports haskell. If you do not have one I recommend starting with [VSCode][VSCODE].
 
-You can install stack following the instructions here: (https://docs.haskellstack.org/en/stable/install_and_upgrade/)[https://docs.haskellstack.org/en/stable/install_and_upgrade/]
+You can install stack following the instructions in the official (Haskell Stack website)[https://docs.haskellstack.org/en/stable/install_and_upgrade/].
 
 Stack will be responsible for installing haskell, the Open-games-hs framework and its dependencies.
 
@@ -41,6 +40,21 @@ Once stack is installed you can run the demo project by running `stack run`. Tha
 print the result of executing an equilibrium check on a very simple game. The rest of the tutorial will go into how
 to use the open-games framework in order to design and analyse games interactively using `ghci`. To invoke it, use
 `stack ghci` and that will start a new interactive session.
+
+### Installing in OSx
+
+It's also possible to get `ghcup` the package manager for haskell using (brew)[https://brew.sh/], the OSx package manager.
+First, make sure you have brew installed in your system. Then you can use it to fetch `ghcup`:
+
+```bash
+brew install ghcup
+```
+
+Once you have `ghcup` it's time to add the necessary dependencies to run Haskell and this project:
+
+```bash
+ghcup install hls stack
+```
 
 # Designing and analyzing games interactively
 
